@@ -1,3 +1,5 @@
 *.ply
 *.ifc
 __pycache__/
+*.pkl
+real_models/

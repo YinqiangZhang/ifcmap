@@ -53,24 +53,24 @@ combined = trimesh.util.concatenate(meshlist)
 combined.export('combined.ply')
 combined.show()
 
-# mesh = pv.read('combined.ply')
+mesh = pv.read('combined.ply')
 
-# for level in levels:
-# 	slices = mesh.slice_along_axis(n=5, axis="z",bounds=[0,0,0,0,level/unitfactor,level/unitfactor+arsheight])
-# 	#slices.plot(cmap=cmap, parallel_projection = True, background='white')
+for level in levels:
+	slices = mesh.slice_along_axis(n=5, axis="z",bounds=[0,0,0,0,level/unitfactor,level/unitfactor+arsheight])
+	#slices.plot(cmap=cmap, parallel_projection = True, background='white')
 
-# 	#single_slice = mesh.slice(normal=[0, 0, 1],origin=[0,0,(level/unitfactor+arsheight)])
-# 	p = pv.Plotter()
-# 	p.set_background("white")
-# 	actor = p.add_mesh(slices,show_scalar_bar=False,cmap=['black','green','yellow'])
+	#single_slice = mesh.slice(normal=[0, 0, 1],origin=[0,0,(level/unitfactor+arsheight)])
+	p = pv.Plotter()
+	p.set_background("white")
+	actor = p.add_mesh(slices,show_scalar_bar=False,cmap=['black','green','yellow'])
 
-# 	#p.set_focus(slices.center)
+	#p.set_focus(slices.center)
 
-# 	p.camera_position = 'xy'
-# 	p.camera.SetParallelProjection(True)
-# 	#p.camera_set = True
-# 	p.show(screenshot='OMs/{0}.png'.format(level))
-# 	p.remove_actor(actor)
+	p.camera_position = 'xy'
+	p.camera.SetParallelProjection(True)
+	#p.camera_set = True
+	p.show(screenshot='OMs/{0}.png'.format(level))
+	p.remove_actor(actor)
 
 
 
