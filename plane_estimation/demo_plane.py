@@ -9,21 +9,19 @@ from utils.plane_utils import generate_plane_points
 
 
 class PlaneCandidate():
-    def __init__(self, plane_id, points, weights, 
-                 inlier_weights=None, 
-                 mu_init=5):
+    def __init__(self, plane_id, points, weights, inliers=None, mu0=5):
         self.id = int(plane_id)
         self.homo_points = np.column_stack((points, np.ones((points.shape[0], 1))))
         self.weights = weights
-        if inlier_weights is not None:
-            self.inlier_weights = inlier_weights
-        else:
-            self.inlier_weights = np.ones_like(weights)
-        self.point_labels = np.zeros_like(weights)
-        self.mu = mu_init
-        self.is_converged = False
+        
+        self.inliers = inliers if inliers is not None else np.ones_like(weights)
+        self.inlier_homo_points = self.homo_points
+        self.inlier_weights = self.weights
+        
+        self.mu = mu0
         self.recover_factor = 1.4
         self.mu_min = 0.1
+        
         self.reset()
     
     def reset(self):
@@ -32,12 +30,12 @@ class PlaneCandidate():
     def update(self, update_mu=True):
         self.plane_params = self.plane_estimate()
         self.weights = self.GM_weight_estimate()
-        self.point_labels = self.label_estimate()
+        self.inliers, self.inlier_homo_points, self.inlier_weights = self.inliner_estimate()
         if update_mu:
             self.mu = self.mu_update()
         
     def plane_estimate(self):
-        point_cluster = self.homo_points.T @ np.diag(np.squeeze(self.weights * self.inlier_weights)) @ self.homo_points
+        point_cluster = self.inlier_homo_points.T @ np.diag(np.squeeze(self.inlier_weights)) @ self.inlier_homo_points
         eig_values, eig_vectors = np.linalg.eig(point_cluster)
         parameters = eig_vectors[:, np.argmin(eig_values)]
         parameters = np.atleast_2d(parameters / np.linalg.norm(parameters[:-1]))
@@ -55,17 +53,21 @@ class PlaneCandidate():
         temp_mu = np.max([self.mu_min, self.mu / self.recover_factor])
         return temp_mu
     
-    def label_estimate(self):
-        self.inlier_weights = np.round(self.weights)
-        point_labels = np.zeros_like(self.weights)
-        point_labels[self.inlier_weights == 1] = self.id
-        return point_labels
+    def inliner_estimate(self):
+        inliers = np.round(self.weights)
+        inlier_indices = np.squeeze(inliers == 1)
+        inlier_homo_points = self.homo_points[inlier_indices, :]
+        inlier_weights = self.weights[inlier_indices, :]
+        return inliers, inlier_homo_points, inlier_weights
+    
+    def get_inlier_points(self):
+        return self.inlier_homo_points[:, :-1]
 
 
 if __name__ == '__main__':
     root_path = os.path.dirname(os.path.abspath(__file__))
 
-    plane1 = generate_plane_points([1, 2, 3, 3], 200) 
+    plane1 = generate_plane_points([1, 2, 3, 3], 300) 
     plane2 = generate_plane_points([1, 1, 1, 1], 1000) 
     plane3 = generate_plane_points([1, 3, 2, 0], 200) 
     noise_plane = np.vstack((plane2, plane1, plane3))
@@ -78,36 +80,32 @@ if __name__ == '__main__':
     print(plane_obj.plane_params)
     
     # other planes test
-    new_weights = weights[np.squeeze(plane_obj.point_labels == 0)]
-    new_noise_plane = noise_plane[np.squeeze(plane_obj.point_labels == 0), :]
+    new_weights = weights[np.squeeze(plane_obj.inliers == 0)]
+    new_noise_plane = noise_plane[np.squeeze(plane_obj.inliers == 0), :]
     plane_obj2 = PlaneCandidate(2, new_noise_plane, new_weights)
     for _ in range(10):
         plane_obj2.update()
     print(plane_obj2.plane_params)
     
-    # outlier_points = noise_plane[plane_obj.inlier_weights == 0]
-    # plane_obj2 = PlaneCandidate(noise_plane, weights, mu_init=5)
-    
-    # visualization
-    # pcd1 = o3d.geometry.PointCloud()
-    # pcd1.points = o3d.utility.Vector3dVector(plane1)
-    # pcd1.paint_uniform_color([1, 0.706, 0])
-    # pcd2 = o3d.geometry.PointCloud()
-    # pcd2.points = o3d.utility.Vector3dVector(plane2)
-    # pcd2.paint_uniform_color([0, 0, 1.0])
-    
     # color mapping
-    colormap_name = ['PiYG', 'PiYG']
+    colormap_name = ['Greens', 'Purples']
     cmap_norm = mpl.colors.Normalize(vmin=0.0, vmax=1.0)
     
-    point_colors = plt.get_cmap('PiYG')(cmap_norm(np.squeeze(plane_obj.weights)))[:, 0:3]
-    # point_colors2 = plt.get_cmap('PiYG')(cmap_norm(np.squeeze(plane_obj2.weights)))[:, 0:3]
-    
+    # plane 1 
+    inlier_points1 = plane_obj.get_inlier_points()
+    point_colors1 = plt.get_cmap(colormap_name[0])(cmap_norm(np.squeeze(plane_obj.inlier_weights)))[:, 0:3]
     pcd_noise = o3d.geometry.PointCloud()
-    pcd_noise.points = o3d.utility.Vector3dVector(noise_plane)
-    pcd_noise.colors = o3d.utility.Vector3dVector(point_colors)
+    pcd_noise.points = o3d.utility.Vector3dVector(inlier_points1)
+    pcd_noise.colors = o3d.utility.Vector3dVector(point_colors1)
     
-    o3d.visualization.draw_geometries([pcd_noise])
+    # plane 2 
+    inlier_points2 = plane_obj2.get_inlier_points()
+    point_colors2 = plt.get_cmap(colormap_name[1])(cmap_norm(np.squeeze(plane_obj2.inlier_weights)))[:, 0:3]
+    pcd_noise2 = o3d.geometry.PointCloud()
+    pcd_noise2.points = o3d.utility.Vector3dVector(inlier_points2)
+    pcd_noise2.colors = o3d.utility.Vector3dVector(point_colors2)
+    
+    o3d.visualization.draw_geometries([pcd_noise, pcd_noise2])
     
     # EM optimization
     # unified framework for plane extraction, plane refinement, registration, and reconstruction. 

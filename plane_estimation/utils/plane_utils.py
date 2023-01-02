@@ -29,3 +29,13 @@ def plain_parameter_estimate(points):
     temp_norm = np.linalg.norm(estimated_parameters[:-1])
     estimated_parameters = estimated_parameters / temp_norm 
     return plane_cost, estimated_parameters
+
+
+if __name__ == '__main__': 
+    pass
+    # pcd1 = o3d.geometry.PointCloud()
+    # pcd1.points = o3d.utility.Vector3dVector(plane1)
+    # pcd1.paint_uniform_color([1, 0.706, 0])
+    # pcd2 = o3d.geometry.PointCloud()
+    # pcd2.points = o3d.utility.Vector3dVector(plane2)
+    # pcd2.paint_uniform_color([0, 0, 1.0])
