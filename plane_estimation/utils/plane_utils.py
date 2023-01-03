@@ -30,6 +30,10 @@ def plain_parameter_estimate(points):
     estimated_parameters = estimated_parameters / temp_norm 
     return plane_cost, estimated_parameters
 
+def rotate_view(vis):
+    ctr = vis.get_view_control()
+    ctr.rotate(2.0, 0.0)
+    return False
 
 if __name__ == '__main__': 
     pass
