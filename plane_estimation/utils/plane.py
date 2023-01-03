@@ -1,12 +1,12 @@
 import numpy as np
 
 class PlaneCandidate():
-    def __init__(self, plane_id, points, weights, inliers=None, mu0=10):
+    def __init__(self, plane_id, points, weights, mu0=10):
         self.id = int(plane_id)
-        self.homo_points = np.column_stack((points, np.ones((points.shape[0], 1))))
+        self.homo_points = self.generate_homo_points(points)
         self.weights = weights
         
-        self.inliers = inliers if inliers is not None else np.ones_like(weights)
+        self.inliers = np.ones_like(weights)
         self.inlier_homo_points = self.homo_points
         self.inlier_weights = self.weights
         
@@ -14,10 +14,10 @@ class PlaneCandidate():
         self.recover_factor = 1.4
         self.mu_min = 0.1
         
-        self.reset()
-    
-    def reset(self):
         self.update()
+        
+    def generate_homo_points(self, points):
+        return np.column_stack((points, np.ones((points.shape[0], 1))))
     
     def update(self, update_mu=True):
         self.plane_params = self.plane_estimate()
@@ -53,3 +53,8 @@ class PlaneCandidate():
     
     def get_inlier_points(self):
         return self.inlier_homo_points[:, :-1]
+    
+    def get_outlier_indices(self):
+        inlier_labels = np.round(self.weights)
+        outlier_indices = np.squeeze(inlier_labels == 0)
+        return outlier_indices

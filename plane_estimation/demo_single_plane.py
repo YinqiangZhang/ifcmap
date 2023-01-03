@@ -50,34 +50,4 @@ if __name__ == '__main__':
         time.sleep(0.5)
     vis.run()
     vis.destroy_window()
-    # print(plane_obj.plane_params)
-    
-    # # other planes test
-    # new_weights = weights[np.squeeze(plane_obj.inliers == 0)]
-    # new_noise_plane = noise_plane[np.squeeze(plane_obj.inliers == 0), :]
-    # plane_obj2 = PlaneCandidate(2, new_noise_plane, new_weights)
-    # for _ in range(10):
-    #     plane_obj2.update()
-    # print(plane_obj2.plane_params)
-    
-    # # plane 1 
-    # inlier_points1 = plane_obj.get_inlier_points()
-    # point_colors1 = plt.get_cmap(colormap_name[0])(cmap_norm(np.squeeze(plane_obj.inlier_weights)))[:, 0:3]
-    # pcd_noise = o3d.geometry.PointCloud()
-    # pcd_noise.points = o3d.utility.Vector3dVector(inlier_points1)
-    # pcd_noise.colors = o3d.utility.Vector3dVector(point_colors1)
-    
-    # # plane 2 
-    # inlier_points2 = plane_obj2.get_inlier_points()
-    # point_colors2 = plt.get_cmap(colormap_name[1])(cmap_norm(np.squeeze(plane_obj2.inlier_weights)))[:, 0:3]
-    # pcd_noise2 = o3d.geometry.PointCloud()
-    # pcd_noise2.points = o3d.utility.Vector3dVector(inlier_points2)
-    # pcd_noise2.colors = o3d.utility.Vector3dVector(point_colors2)
-    
-    # vis = o3d.visualization.Visualizer()
-    # vis.create_window()
-    # vis.add_geometry(pcd_noise)
-    # vis.register_animation_callback(rotate_view)
-    # vis.run()
-    # vis.destroy_window()
     
