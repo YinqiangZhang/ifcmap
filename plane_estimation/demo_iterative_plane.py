@@ -18,9 +18,9 @@ if __name__ == '__main__':
     cmap_norm = mpl.colors.Normalize(vmin=0.0, vmax=1.0)
 
     # generate original data
-    plane1 = generate_plane_points([1, 2, 3, 3], 300) 
-    plane2 = generate_plane_points([1, 1, 1, 1], 1000) 
-    plane3 = generate_plane_points([1, 3, 2, 0], 200) 
+    plane1 = generate_plane_points([1, 2, 3, 3], 500, [-4, 4]) 
+    plane2 = generate_plane_points([1, 1, 1, 1], 1500) 
+    plane3 = generate_plane_points([1, 3, 2, 0], 300, [-3, 3]) 
     points = np.vstack((plane2, plane1, plane3))
     
     plane_dict = dict()
