@@ -1,7 +1,7 @@
 import numpy as np
 
 class PlaneCandidate():
-    def __init__(self, plane_id, points, weights, mu0=10):
+    def __init__(self, plane_id, points, weights, mu0=20):
         self.id = int(plane_id)
         self.points = points
         self.homo_points = self.generate_homo_points(points)

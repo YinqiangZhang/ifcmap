@@ -1,2 +1,2 @@
 from utils.plane_utils import *
-from utils.plane import PlaneCandidate
+from utils.plane_manager import PlaneCandidate
