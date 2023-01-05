@@ -21,12 +21,14 @@ class PlaneManager():
         self.iter_num = 0
         
     def step(self):
+        print("Try to segment plane {}".format(self.iter_num))
         weights = np.ones((self.outlier_points.shape[0], 1))
         plane_obj = PlaneCandidate(self.iter_num, self.outlier_points, weights)
-        for _ in range(10):
+        for idx in range(20):
             plane_obj.update()
-        if np.sum(plane_obj.inliers) > self.min_point_num:
-            self.plane_dict[plane_obj.id] = plane_obj
+            print('Iter {} with {} inliers'.format(idx, np.sum(plane_obj.inliers)))
+        # if np.sum(plane_obj.inliers) > self.min_point_num:
+        self.plane_dict[plane_obj.id] = plane_obj
         self.outlier_points = self.outlier_points[np.squeeze(plane_obj.inliers == 0), :]
         self.rest_point_num = self.outlier_points.shape[0]
         self.iter_num += 1
@@ -35,8 +37,8 @@ class PlaneManager():
         # create o3d points
         plane_points_list = list()
         for idx, (_, plane_obj) in enumerate(self.plane_dict.items()):
-            inlier_points = plane_obj.get_inlier_points()
-            point_colors = plt.get_cmap(self.colormap_name[idx%3])(self.cmap_norm(np.squeeze(plane_obj.inlier_weights)))[:, 0:3]
+            inlier_points, inlier_weights = plane_obj.get_inliers()
+            point_colors = plt.get_cmap(self.colormap_name[idx%3])(self.cmap_norm(np.squeeze(inlier_weights)))[:, 0:3]
             pcd_points = o3d.geometry.PointCloud()
             pcd_points.points = o3d.utility.Vector3dVector(inlier_points)
             pcd_points.colors = o3d.utility.Vector3dVector(point_colors)

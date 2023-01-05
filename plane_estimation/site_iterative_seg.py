@@ -6,6 +6,7 @@ import open3d as o3d
 import numpy as np 
 from utils.plane_manager import PlaneManager
 
+# Lesson: we need to first get a initial result
 if __name__ == '__main__':
     root_path = os.path.dirname(os.path.abspath(__file__))
     
@@ -15,6 +16,6 @@ if __name__ == '__main__':
     
     plane_manager = PlaneManager(site_pcd_cloud)
     
-    for _ in range(10):
+    for _ in range(2):
         plane_manager.step()
     plane_manager.render()
