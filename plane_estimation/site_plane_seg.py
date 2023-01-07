@@ -25,10 +25,11 @@ if __name__ == '__main__':
     
     weights = np.ones((noise_plane.shape[0], 1))
     plane_obj = PlaneCandidate(1, noise_plane, weights)
+    plane_obj.update()
     
-    point_colors = plt.get_cmap('RdBu')(cmap_norm(np.squeeze(plane_obj.weights)))[:, 0:3]
     pcd_noise = o3d.geometry.PointCloud()
     pcd_noise.points = o3d.utility.Vector3dVector(noise_plane)
+    point_colors = plt.get_cmap('RdBu')(cmap_norm(np.squeeze(plane_obj.weights)))[:, 0:3]
     pcd_noise.colors = o3d.utility.Vector3dVector(point_colors)
     
     coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=3.0)
@@ -36,14 +37,6 @@ if __name__ == '__main__':
     vis.create_window()
     vis.add_geometry(pcd_noise)
     vis.add_geometry(coordinate_frame)
-    for _ in range(10):
-        plane_obj.update()
-        point_colors = plt.get_cmap('RdBu')(cmap_norm(np.squeeze(plane_obj.weights)))[:, 0:3]
-        pcd_noise.colors = o3d.utility.Vector3dVector(point_colors)
-        vis.update_geometry(pcd_noise)
-        vis.poll_events()
-        vis.update_renderer()
-        time.sleep(0.001)
     vis.run()
     vis.destroy_window()
     

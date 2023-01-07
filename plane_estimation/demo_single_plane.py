@@ -40,7 +40,7 @@ if __name__ == '__main__':
     ctr = vis.get_view_control()
     ctr.convert_from_pinhole_camera_parameters(camera_parameters)
     # vis.add_geometry(coordinate_frame)
-    for _ in range(15):
+    for _ in range(1):
         plane_obj.update()
         point_colors = plt.get_cmap('RdBu')(cmap_norm(np.squeeze(plane_obj.weights)))[:, 0:3]
         pcd_noise.colors = o3d.utility.Vector3dVector(point_colors)

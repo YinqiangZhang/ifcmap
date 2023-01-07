@@ -12,10 +12,18 @@ if __name__ == '__main__':
     
     data_path_list = glob.glob(os.path.join(root_path, 'site_cloud_data', '*.ply'))
     data_path = data_path_list[0]
-    site_pcd_cloud = np.asarray(o3d.io.read_point_cloud(data_path).points)
     
-    plane_manager = PlaneManager(site_pcd_cloud)
+    cloud = o3d.io.read_point_cloud(data_path)
+    cloud.paint_uniform_color(np.array([211, 211, 211])/255.0)
+    points = np.asarray(cloud.points)
     
-    for _ in range(2):
+    plane_manager = PlaneManager(points)
+    for _ in range(10):
         plane_manager.step()
-    plane_manager.render()
+        
+    vis = o3d.visualization.Visualizer()
+    vis.create_window()
+    plane_manager.render(vis)
+    vis.add_geometry(cloud)
+    vis.run()
+    vis.destroy_window()

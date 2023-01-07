@@ -76,6 +76,8 @@ def get_normal_map(vertex_map):
                 continue
             delta_h = h_neighbor - point
             delta_w = w_neighbor - point
+            if (np.linalg.norm(delta_h) > 1 or np.linalg.norm(delta_w) > 1):
+                continue
             normal_vector = np.cross(delta_h, delta_w)
             normal_map[h_ind, w_ind] = normal_vector/np.linalg.norm(normal_vector)
     return normal_map
