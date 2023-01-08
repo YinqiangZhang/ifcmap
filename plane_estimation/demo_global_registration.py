@@ -59,6 +59,12 @@ def refine_registration(source, target, trans_init, voxel_size):
 root_path = os.path.dirname(os.path.abspath(__file__))    
 data_path_list = glob.glob(os.path.join(root_path, 'site_cloud_data', '*.ply'))
 
+# mesh_path_list = glob.glob(os.path.join(root_path, 'layers', '*.ply'))
+# mesh = o3d.io.read_triangle_mesh(mesh_path_list[5])
+# mesh.compute_vertex_normals()
+# mesh.paint_uniform_color(np.array([65, 105, 225])/255.0)
+
+
 # read all clouds
 cloud_list = list()
 for idx, data_path in enumerate(data_path_list):
@@ -67,18 +73,39 @@ for idx, data_path in enumerate(data_path_list):
     if idx == 100:
         break
 
-# coarse registration
-cloud1, cloud2= cloud_list[0], cloud_list[50]
-voxel_size = 0.8
-cloud_down1, cloud_fpfh1 = preprocess_point_cloud(cloud1, voxel_size)
-cloud_down2, cloud_fpfh2 = preprocess_point_cloud(cloud2, voxel_size)
-result_ransac = execute_global_registration(cloud_down1, cloud_down2, cloud_fpfh1, cloud_fpfh2, voxel_size)
-print(result_ransac)
+# cloud0 = mesh.sample_points_uniformly(number_of_points=2000000)
+# transfromed_points = np.asarray(cloud0.points)
+# transfromed_points -= np.mean(transfromed_points, axis=0)
+# cloud0.points = o3d.utility.Vector3dVector(transfromed_points)
 
-# fine_registration
-voxel_size = 0.2
-cloud_down1, cloud_fpfh1 = preprocess_point_cloud(cloud1, voxel_size)
-cloud_down2, cloud_fpfh2 = preprocess_point_cloud(cloud2, voxel_size)
-result_icp = refine_registration(cloud_down1, cloud_down2, result_ransac.transformation, voxel_size)
+static_map = o3d.geometry.PointCloud()
+static_map += cloud_list[0]
 
-draw_registration_result(cloud_down1, cloud_down2, result_icp.transformation)
+for new_cloud in cloud_list[1:10]:
+    cloud1, cloud2 = new_cloud, static_map
+    # coarse registration
+    # voxel_size = 0.8
+    # cloud_down1, cloud_fpfh1 = preprocess_point_cloud(cloud1, voxel_size)
+    # cloud_down2, cloud_fpfh2 = preprocess_point_cloud(cloud2, voxel_size)
+    # result_ransac = execute_global_registration(cloud_down1, cloud_down2, cloud_fpfh1, cloud_fpfh2, voxel_size)
+    # print(result_ransac)
+    # fine_registration
+    voxel_size = 0.1
+    cloud_fine1, cloud_fpfh1 = preprocess_point_cloud(cloud1, voxel_size)
+    cloud_fine2, cloud_fpfh2 = preprocess_point_cloud(cloud2, voxel_size)
+    result_icp = refine_registration(cloud_fine1, cloud_fine2, np.identity(4), voxel_size)
+
+    static_map += cloud1.transform(result_icp.transformation)
+    
+# draw_registration_result(static_map, new_cloud, result_icp.transformation)
+# static_map.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=0.2, max_nn=30))
+# mesh, densities = o3d.geometry.TriangleMesh.create_from_point_cloud_poisson(static_map, depth=10)
+static_map.paint_uniform_color(np.array([65, 105, 225])/255.0)
+coordinate_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=3.0)
+vis = o3d.visualization.Visualizer()
+vis.create_window()
+vis.add_geometry(static_map)
+# vis.add_geometry(mesh)
+vis.add_geometry(coordinate_frame)
+vis.run()
+vis.destroy_window()
