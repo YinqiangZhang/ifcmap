@@ -8,8 +8,8 @@ from utils.range_image_utils import project_to_range_image
 
 
 class PlaneManager():
-    def __init__(self, points):
-        self.min_point_num = 600
+    def __init__(self, points, min_point_num=600):
+        self.min_point_num = min_point_num
         self.colormap_name = ['winter', 'Wistia', 'cool'] # TODO: label plane with different colors
         self.cmap_norm = mpl.colors.Normalize(vmin=0.0, vmax=1.0)
         # range_image, vertex_map = project_to_range_image(cloud, w, h, max_range=75)

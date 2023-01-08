@@ -35,7 +35,7 @@ class PlaneCandidate():
                 self.plane_params, cost = self.plane_estimate(weight_update=True)
                 self.weights = self.GM_weight_estimate()
                 self.inliers = self.inliner_estimate()                
-                print('Outer loop: {}, inner loop: {}, cost: {}, mu: {}'.format(out_idx, in_idx, cost, self.mu))
+                # print('Outer loop: {}, inner loop: {}, cost: {}, mu: {}'.format(out_idx, in_idx, cost, self.mu))
                 if not np.isinf(pre_cost) and abs(cost - pre_cost)/cost < 0.01:
                     break
                 in_idx += 1
@@ -77,7 +77,7 @@ class PlaneCandidate():
     def mu_update(self):
         return np.max([self.mu_min, self.mu / self.recover_factor])
     
-    def inliner_estimate(self, threshold=0.8):
+    def inliner_estimate(self, threshold=0.95):
         inliers = np.zeros_like(self.weights)
         inliers[self.weights>=threshold] = 1
         return inliers
