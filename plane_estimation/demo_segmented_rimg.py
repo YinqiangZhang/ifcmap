@@ -34,7 +34,10 @@ vis = o3d.visualization.Visualizer()
 vis.create_window()
 # vis.register_animation_callback(rotate_view)
 # vis.add_geometry(static_map.voxel_down_sample(0.1))
+# ctr = vis.get_view_control()
+# ctr.convert_from_pinhole_camera_parameters(camera_parameters)
 for plane in plane_list:
     vis.add_geometry(plane)
+
 vis.run()
 vis.destroy_window()

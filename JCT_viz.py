@@ -13,12 +13,12 @@ target_storey_list = {
                     # 'Storey_B1M_F.ply': [83, 134, 139],
                     # 'Storey_G_F.ply': [72, 61, 139],
                     # 'Storey_1_F.ply': [47, 79, 79],
-                    'Storey_2_F.ply': [65, 105, 225], 
-                    'Storey_3_F.ply': [255, 215, 0], 
-                    'Storey_3M_F.ply': [205, 92, 92],
+                    # 'Storey_2_F.ply': [65, 105, 225], 
+                    # 'Storey_3_F.ply': [255, 215, 0], 
+                    # 'Storey_3M_F.ply': [205, 92, 92],
                     # 'Storey_4_F.ply': [139, 101, 8],
-                    # 'Storey_5_F.ply': [28, 134, 238],
-                    # 'Storey_6_F.ply': [154, 205, 50], 
+                    'Storey_5_F.ply': [28, 134, 238],
+                    'Storey_6_F.ply': [154, 205, 50], 
                     # 'Storey_7_F.ply': [132, 112, 255],
                     }
 

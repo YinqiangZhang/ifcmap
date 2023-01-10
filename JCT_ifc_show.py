@@ -12,7 +12,7 @@ from matplotlib import cm
 # read ifc file
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 data_folder = 'real_models'
-ifc_filename = 'structure_all.ifc'
+ifc_filename = 'structure_small.ifc'
 ifc_file = ifcopenshell.open(os.path.join(data_folder, ifc_filename))
 
 # parse ifc settings 
@@ -48,7 +48,7 @@ for idx, storey in enumerate(storeys):
         storey_list.append(mesh)
         mesh_list.append(mesh)
     layer_combined = trimesh.util.concatenate(storey_list)
-    layer_combined.export(os.path.join('result_map', 'layers_all', 'Storey_{}.ply'.format('_'.join(storey.Name.split('/')))))
+    layer_combined.export(os.path.join('result_map', 'layers', 'Storey_{}.ply'.format('_'.join(storey.Name.split('/')))))
 
 print('Error Global ID: {}'.format(error_list))
 
