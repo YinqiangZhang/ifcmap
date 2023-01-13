@@ -12,7 +12,7 @@ from matplotlib import cm
 # read ifc file
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 data_folder = 'real_models'
-ifc_filename = 'structure_small.ifc'
+ifc_filename = 'structure_small_test.ifc'
 ifc_file = ifcopenshell.open(os.path.join(data_folder, ifc_filename))
 
 # parse ifc settings 

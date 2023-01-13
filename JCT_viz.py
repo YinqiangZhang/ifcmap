@@ -17,23 +17,25 @@ target_storey_list = {
                     # 'Storey_3_F.ply': [255, 215, 0], 
                     # 'Storey_3M_F.ply': [205, 92, 92],
                     # 'Storey_4_F.ply': [139, 101, 8],
-                    'Storey_5_F.ply': [28, 134, 238],
+                    # 'Storey_5_F.ply': [28, 134, 238],
                     'Storey_6_F.ply': [154, 205, 50], 
-                    # 'Storey_7_F.ply': [132, 112, 255],
+                    'Storey_7_F.ply': [132, 112, 255],
                     }
 
 mesh_list = list()
 for target_storey, color in target_storey_list.items():
-    mesh = o3d.io.read_triangle_mesh(os.path.join('result_map', 'layers_all', target_storey))
+    mesh = o3d.io.read_triangle_mesh(os.path.join('result_map', 'layers', target_storey))
     mesh.compute_vertex_normals()
     mesh.paint_uniform_color(np.array(color)/255.0)
     mesh_list.append(mesh)
-	
-pcd = mesh.sample_points_uniformly(number_of_points=5000)
+
+# mesh_all = o3d.io.read_triangle_mesh(os.path.join('result_map', 'structure_small_all.ply'))
+# mesh_all.compute_vertex_normals()
 
 vis = o3d.visualization.Visualizer()
 vis.create_window()
 for mesh in mesh_list:
     vis.add_geometry(mesh)
+# vis.add_geometry(mesh_all)
 vis.run()
 vis.destroy_window()
