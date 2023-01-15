@@ -7,6 +7,45 @@ import open3d as o3d
 import matplotlib.pyplot as plt 
 import matplotlib as mpl
 import trimesh
+import networkx as nx
+import numpy as np
+
+def get_connected_plane_components(element):
+    face_normals = element.face_normals 
+    face_adjacency = element.face_adjacency
+    g = nx.from_edgelist(face_adjacency)
+    left_nodes = set(g.nodes)
+    result_components = list()
+    while len(left_nodes) != 0:
+        # init component
+        connected_ids = list()
+        seed_idx = np.random.choice(list(left_nodes))
+        open_set = set()
+        open_list = list()
+        open_set.add(seed_idx)
+        open_list.append(seed_idx)
+        connected_ids.append(seed_idx)
+        left_nodes.remove(seed_idx)
+        target_normal = face_normals[seed_idx, :]
+        # iteration
+        while len(open_set)!= 0: 
+            open_idx = open_list.pop()
+            open_set.remove(open_idx)
+            for neighbor_idx in g.neighbors(open_idx):
+                neighbor_normal = face_normals[neighbor_idx, :]
+                if (abs(np.dot(target_normal, neighbor_normal)) >= 0.97 and 
+                    neighbor_idx in left_nodes):
+                    connected_ids.append(neighbor_idx)
+                    open_set.add(neighbor_idx)
+                    open_list.append(neighbor_idx)
+                    left_nodes.remove(neighbor_idx)
+        component_mesh = trimesh.util.submesh(element, [connected_ids], repair=False, append=True)
+        points, point_indices = trimesh.sample.sample_surface(component_mesh, 100)
+        pcd = trimesh.PointCloud(points)
+    return result_components
+
+def plane_based_point_sampling():
+    pass
 
 # read segmented plane
 root_path = os.path.dirname(os.path.abspath(__file__))    
@@ -25,7 +64,8 @@ mesh_path_list = glob.glob(os.path.join(mesh_data_path, '*.ply'))
 mesh_list = list(trimesh.load(elem_path) for elem_path in mesh_path_list)
 sorted_mesh_list = sorted(mesh_list, key=lambda x:x.area, reverse=True)
 demo_mesh = trimesh.util.concatenate(sorted_mesh_list[:2])
-
+get_connected_plane_components(sorted_mesh_list[50])
+# sorted_mesh_list[50].show()
 o3d_mesh = o3d.io.read_triangle_mesh(mesh_path)
 o3d_mesh.compute_vertex_normals()
 
@@ -45,7 +85,7 @@ for idx, plane in enumerate(sorted_plane_data):
         ground_planes += dws_points
     
 transf_mat, cost = trimesh.registration.mesh_other(
-    demo_mesh, np.asarray(ground_planes.points), samples=50, scale=False, icp_first=2, icp_final=5
+    demo_mesh, np.asarray(ground_planes.points), samples=50, scale=False, icp_first=1, icp_final=2
 )
 print(transf_mat, cost)
 transformed_planes = copy.deepcopy(planes).transform(np.linalg.inv(transf_mat))
