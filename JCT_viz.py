@@ -19,12 +19,12 @@ target_storey_list = {
                     # 'Storey_4_F.ply': [139, 101, 8],
                     # 'Storey_5_F.ply': [28, 134, 238],
                     'Storey_6_F.ply': [154, 205, 50], 
-                    'Storey_7_F.ply': [132, 112, 255],
+                    # 'Storey_7_F.ply': [132, 112, 255],
                     }
 
 mesh_list = list()
 for target_storey, color in target_storey_list.items():
-    mesh = o3d.io.read_triangle_mesh(os.path.join('result_map', 'layers', target_storey))
+    mesh = o3d.io.read_triangle_mesh(os.path.join('result_map', 'layers_all', target_storey))
     mesh.compute_vertex_normals()
     mesh.paint_uniform_color(np.array(color)/255.0)
     mesh_list.append(mesh)

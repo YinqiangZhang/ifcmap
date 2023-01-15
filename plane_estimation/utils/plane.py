@@ -77,7 +77,7 @@ class PlaneCandidate():
     def mu_update(self):
         return np.max([self.mu_min, self.mu / self.recover_factor])
     
-    def inliner_estimate(self, threshold=0.5):
+    def inliner_estimate(self, threshold=0.95):
         inliers = np.zeros_like(self.weights)
         inliers[self.weights>=threshold] = 1
         return inliers
