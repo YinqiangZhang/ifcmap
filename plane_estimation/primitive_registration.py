@@ -26,17 +26,20 @@ sorted_mesh_list = sorted(mesh_list, key=lambda x:x.get_surface_area(), reverse=
 
 point_list = list()
 strucutre_points = o3d.geometry.PointCloud()
-for mesh in sorted_mesh_list:
+for mesh in sorted_mesh_list[:2]:
     area = mesh.get_surface_area()
     points = mesh.sample_points_uniformly(number_of_points=int(area), use_triangle_normal=True)
     point_list.append(points)
     strucutre_points += points
     # o3d.visualization.draw_geometries([points])
 
+# selected_indices = [0, 1, ]
+
 # plane processing
 planes = o3d.geometry.PointCloud()
+obb_list = list()
 ground_planes = o3d.geometry.PointCloud()
-for idx, plane in enumerate(sorted_plane_data):
+for idx, plane in enumerate(sorted_plane_data[2:]):
     plane_points = o3d.geometry.PointCloud()
     inlier_points = plane.points[np.squeeze(plane.inliers==1), :]
     plane_points.points = o3d.utility.Vector3dVector(inlier_points)
@@ -45,25 +48,30 @@ for idx, plane in enumerate(sorted_plane_data):
         )
     color = plt.get_cmap('nipy_spectral')(cmap_norm(plane.id))[0:3]
     plane_points.paint_uniform_color(color)
-    dws_points = plane_points.voxel_down_sample(voxel_size=1.0)
-    print('Plane parameters: {}'.format(plane.plane_params))
-    print('Point Number: {}'.format(np.asarray(dws_points.points).shape[0]))
+    dws_points = plane_points.voxel_down_sample(voxel_size=0.1)
+    # print('Plane parameters: {}'.format(plane.plane_params))
+    # print('Point Number: {}'.format(np.asarray(dws_points.points).shape[0]))
+    obb = dws_points.get_oriented_bounding_box()
+    obb.color = (0,0,0)
+    obb_list.append(obb)
     planes += dws_points
     if idx < 2:
         ground_planes += dws_points
 
 result = o3d.pipelines.registration.registration_icp(
-    planes, strucutre_points, 2.0, np.identity(4),
+    ground_planes, strucutre_points, 2.0, np.identity(4),
     o3d.pipelines.registration.TransformationEstimationPointToPlane())
 
 print('Transformation result: {}'.format(result.transformation))
 
-planes.transform(result.transformation)
+# planes.transform(result.transformation)
 
 vis = o3d.visualization.Visualizer()
 vis.create_window()
-vis.add_geometry(strucutre_points)
+# vis.add_geometry(strucutre_points)
 vis.add_geometry(planes)
+for obb in obb_list:
+    vis.add_geometry(obb)
 vis.run()
 vis.destroy_window()
 
