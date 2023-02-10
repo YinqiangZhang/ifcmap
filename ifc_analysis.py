@@ -18,15 +18,19 @@ from sklearn.cluster import DBSCAN
 
 root_path = os.path.dirname(os.path.abspath(__file__)) 
 ifc_files = glob.glob(os.path.join(root_path, 'real_models', '*.ifc'))
-ifc_file_whole = ifc_files[0]
+
+ifc_file_env = ifc_files[0]
 ifc_file_structure = ifc_files[2]
 
-ifc_model = ifcopenshell.open(ifc_file_whole)
-storeys = ifc_model.by_type('IfcBuildingStorey')
+ifc_env_model = ifcopenshell.open(ifc_file_env)
+env_storeys = ifc_env_model.by_type('IfcBuildingStorey')
+
+ifc_structure_model = ifcopenshell.open(ifc_file_structure)
+structure_storeys = ifc_structure_model.by_type('IfcBuildingStorey')
 
 settings = ifc_geom.settings()
 settings.set(settings.USE_WORLD_COORDS, True)
-unitfactor = getunitfactor(ifc_model) # millimeter
+unitfactor = getunitfactor(ifc_env_model) # millimeter
 
 # color_dict = {
 #     # 'IfcPlate': [107, 142, 35],
@@ -42,18 +46,18 @@ unitfactor = getunitfactor(ifc_model) # millimeter
 color_dict = {
     'IfcColumn': [106, 90, 205],
     # 'IfcSite': 	[65, 105, 225],
-    'IfcRamp': [60, 179, 113], 
+    # 'IfcRamp': [60, 179, 113], 
     # 'IfcFlowTerminal': [255, 215, 0],
     # 'IfcGrid': [205, 92, 92],
     'IfcWallStandardCase': [205, 133, 63],
-    'IfcWall': [176, 48, 96],
+    # 'IfcWall': [176, 48, 96],
     # 'IfcDoor': [255, 218, 185],
-    'IfcSlab': [205, 205, 193],
+    'IfcSlab': [65, 105, 225],
     # 'IfcStair': [187, 255, 255],
     # 'IfcCovering': [192, 255, 62],
     # 'IfcBuildingElementProxy': [255, 246, 143],
     # 'IfcFurnishingElement': [205, 190, 112],
-    # 'IfcWindow': [139, 101, 8],
+    'IfcWindow': [139, 101, 8],
     'IfcBeam': [255, 130, 71],
     # 'IfcRailing': [255, 140, 105],
     # 'IfcStairFlight': [238, 106, 80], 
@@ -61,7 +65,7 @@ color_dict = {
     # 'IfcPlate': [255, 225, 255], 
     # 'IfcFastener': [144, 238, 144], 
     # 'IfcCurtainWall': [224, 238, 224],
-    'IfcRampFlight': [205, 183, 181], 
+    # 'IfcRampFlight': [205, 183, 181], 
 }
 
 element_colors = {
@@ -75,45 +79,51 @@ target_elev = 58780.0 / unitfactor
 storey_mesh = o3d.geometry.TriangleMesh()
 o3d_mesh_list = list()
 
-for storey_idx, storey in enumerate(storeys[10:11], 0):
-    elev = get_storey_elevation(storey)
-    elements = get_decomposition(storey)
-    print('Storey {}, Elevation: {:.4}'.format(storey.Name, elev/unitfactor))
-    types = list(elem.get_info()['type'] for elem in elements)
+for storey_idx, (env_storey, structure_storey) in enumerate(zip(env_storeys[10:11], structure_storeys[10:11])):
+    env_elev = get_storey_elevation(env_storey)
+    structure_elev = get_storey_elevation(structure_storey)
+    
+    env_elements = get_decomposition(env_storey)
+    structure_elements = get_decomposition(structure_storey)
+    print('Storey {}, Elevation: {:.4}'.format(env_storey.Name, env_elev/unitfactor))
+    # types = list(elem.get_info()['type'] for elem in env_elements)
     # print(set(types))
     
-    for element_idx, element in enumerate(elements):
-        elem_type = element.get_info()['type']
-        color = color_dict.get(elem_type, None)
-        if color is None:
-            continue
-        try:
-            shape = ifc_geom.create_shape(settings, element)
-        except RuntimeError:
-            print('error')
-            continue
-        mesh = meshfromshape(shape, [0,255,0,100])
-        o3d_mesh = mesh.as_open3d
-        type_name = element.ObjectType.split(':')[0]
-        # print(element.ObjectType, mesh.body_count)
-        
-        # color = element_colors.get(type_name, None)
-        # if color is None:
-        #     continue
-        
-        # check elevation
-        z_coords = np.asarray(o3d_mesh.vertices)[:, 2]
-        min_elev, max_elev = np.min(z_coords), np.max(z_coords)
-        if max_elev < target_elev:
-            continue
-        o3d_mesh.compute_vertex_normals()
-        o3d_mesh.paint_uniform_color(np.array(color)/255.0)
-        storey_mesh += o3d_mesh
-        
-        o3d_mesh_list.append(('S{}_E{}.ply'.format(storey_idx, element_idx), o3d_mesh))
-        
-        # sample_pcd = o3d_mesh.sample_points_uniformly(number_of_points=2000, use_triangle_normal=True)
-        # o3d.visualization.draw_geometries([o3d_mesh])
+    for element_idx, element_pair in enumerate(zip(env_elements, structure_elements)):
+        for element in element_pair:
+            elem_type = element.get_info()['type']
+            color = color_dict.get(elem_type, None)
+            if color is None:
+                continue
+            try:
+                shape = ifc_geom.create_shape(settings, element)
+            except RuntimeError:
+                print('error')
+                continue
+            mesh = meshfromshape(shape, [0,255,0,100])
+            if mesh.vertices.shape[0] == 0:
+                continue 
+            o3d_mesh = mesh.as_open3d
+            type_name = element.ObjectType.split(':')[0]
+            # print(element.ObjectType, mesh.body_count)
+            
+            # color = element_colors.get(type_name, None)
+            # if color is None:
+            #     continue
+            
+            # check elevation
+            z_coords = np.asarray(o3d_mesh.vertices)[:, 2]
+            min_elev, max_elev = np.min(z_coords), np.max(z_coords)
+            if max_elev < target_elev:
+                continue
+            o3d_mesh.compute_vertex_normals()
+            o3d_mesh.paint_uniform_color(np.array(color)/255.0)
+            storey_mesh += o3d_mesh
+            
+            o3d_mesh_list.append(('S{}_E{}.ply'.format(storey_idx, element_idx), o3d_mesh))
+            
+            # sample_pcd = o3d_mesh.sample_points_uniformly(number_of_points=2000, use_triangle_normal=True)
+            # o3d.visualization.draw_geometries([o3d_mesh])
 
 
 structure_vertices = np.asarray(storey_mesh.vertices)
@@ -121,10 +131,10 @@ vertices_centroid = np.mean(structure_vertices, axis = 0)
 structure_vertices -= vertices_centroid
 storey_mesh.vertices = o3d.utility.Vector3dVector(structure_vertices)
 
-for mesh_info in o3d_mesh_list:
-    vertices = np.asarray(mesh_info[1].vertices)
-    vertices -= vertices_centroid
-    mesh_info[1].vertices = o3d.utility.Vector3dVector(vertices)
+# for mesh_info in o3d_mesh_list:
+#     vertices = np.asarray(mesh_info[1].vertices)
+#     vertices -= vertices_centroid
+#     mesh_info[1].vertices = o3d.utility.Vector3dVector(vertices)
     # o3d.io.write_triangle_mesh(
     #             os.path.join(root_path, 'plane_estimation', 'mesh_data', mesh_info[0]),
     #             mesh_info[1]
