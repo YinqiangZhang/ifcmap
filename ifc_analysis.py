@@ -14,7 +14,34 @@ from ifcopenshell.geom import tree
 import pandas as pd
 import open3d as o3d 
 import trimesh
-from sklearn.cluster import DBSCAN
+
+def analyze_wall_shapes(mesh):
+    model_plane_list = list()
+    for facet, area in zip(mesh.facets, mesh.facets_area):
+        vertex_indices = np.unique(mesh.faces[facet].reshape(-1)) 
+        face_normals = np.mean(np.asarray(mesh.face_normals[facet]), axis=0)
+        model_plane_list.append((area, vertex_indices, face_normals))
+    sorted_model_planes = sorted(model_plane_list, key= lambda x: x[0], reverse=True)
+    # if wall-like objects, we only extract two largest surfaces
+    target_wall_planes = sorted_model_planes[:2]
+    plane_params = list()
+    for area, indices, normals in target_wall_planes:
+        plane_points = np.asarray(mesh.vertices[indices])
+        d = -np.dot(np.mean(plane_points, axis=0), normals)
+        plane_params.append(np.append(normals, d))
+    # extract vertex coordinates
+    return plane_params
+
+def model_plane_extraction(mesh_list, centroid):
+    mesh_plane_list = list()
+    new_mesh_list = list()
+    for mesh in mesh_list:
+        verts = np.asarray(mesh.vertices) - centroid
+        new_mesh = trimesh.Trimesh(vertices=verts,faces=mesh.faces, edges=mesh.edges, process=True)
+        obj_plane_params = analyze_wall_shapes(new_mesh)
+        mesh_plane_list.append(obj_plane_params)
+        new_mesh_list.append(new_mesh)
+    return mesh_plane_list, new_mesh_list
 
 root_path = os.path.dirname(os.path.abspath(__file__)) 
 ifc_files = glob.glob(os.path.join(root_path, 'real_models', '*.ifc'))
@@ -44,7 +71,7 @@ unitfactor = getunitfactor(ifc_env_model) # millimeter
 # }
 
 color_dict = {
-    'IfcColumn': [106, 90, 205],
+    # 'IfcColumn': [106, 90, 205],
     # 'IfcSite': 	[65, 105, 225],
     # 'IfcRamp': [60, 179, 113], 
     # 'IfcFlowTerminal': [255, 215, 0],
@@ -57,8 +84,8 @@ color_dict = {
     # 'IfcCovering': [192, 255, 62],
     # 'IfcBuildingElementProxy': [255, 246, 143],
     # 'IfcFurnishingElement': [205, 190, 112],
-    'IfcWindow': [139, 101, 8],
-    'IfcBeam': [255, 130, 71],
+    # 'IfcWindow': [139, 101, 8],
+    # 'IfcBeam': [255, 130, 71],
     # 'IfcRailing': [255, 140, 105],
     # 'IfcStairFlight': [238, 106, 80], 
     # 'IfcMember': [255, 181, 197], 
@@ -68,16 +95,35 @@ color_dict = {
     # 'IfcRampFlight': [205, 183, 181], 
 }
 
-element_colors = {
-                'Rectangular steel tube column': [255, 215, 0], 
-                'Column-UC': [255, 69, 0], 
-                '楼板': [99, 184, 255],
-                'Column-RC-Rectangular': [192, 255, 62], 
+# element_colors = {
+#                 'Rectangular steel tube column': [255, 215, 0], 
+#                 'Column-UC': [255, 69, 0], 
+#                 '楼板': [99, 184, 255],
+#                 'Column-RC-Rectangular': [192, 255, 62], 
+#                 }
+
+# only use 180 to be the plate
+slab_elements = {#'楼板:JCT-A-FLR-RC-50mm': [106, 90, 205], # env
+                '楼板:JCT-C99-SLA-RC-180mm': [205, 92, 92], # structure
                 }
+
+wall_elements = {
+    # '基本墙:JCT-A-WAL-RC-300mm': [112, 128, 144],
+    # '基本墙:JCT-A-WAL-RC-225mm': [135, 206, 235], # blue 
+    '基本墙:JCT-A-WAL-RC-150mm': [85, 107, 47],
+    # '基本墙:JCT-A-WAL-RC-200mm': [205, 133, 63],
+    # '基本墙:JCT-A-WAL-RC-100mm': [255, 99, 71],
+    # '基本墙:JCT-A-WAL-Block Wall_100mm': [186, 85, 211], 
+    # '基本墙:JCT-A-WAL-partition-100mm':[255, 222, 173], 
+    # '基本墙:JCT-A-WAL-partition-25mm': [171, 130, 255], 
+    # '基本墙:JCT-A-WAL-partition-80mm': [238, 122, 233], 
+    # '基本墙:JCT-C-SWL-RC-150mm': [255, 69, 0], orange rectangular 
+}
 
 target_elev = 58780.0 / unitfactor
 storey_mesh = o3d.geometry.TriangleMesh()
 o3d_mesh_list = list()
+tri_mesh_list = list()
 
 for storey_idx, (env_storey, structure_storey) in enumerate(zip(env_storeys[10:11], structure_storeys[10:11])):
     env_elev = get_storey_elevation(env_storey)
@@ -90,7 +136,7 @@ for storey_idx, (env_storey, structure_storey) in enumerate(zip(env_storeys[10:1
     # print(set(types))
     
     for element_idx, element_pair in enumerate(zip(env_elements, structure_elements)):
-        for element in element_pair:
+        for pair_idx, element in enumerate(element_pair[:]):
             elem_type = element.get_info()['type']
             color = color_dict.get(elem_type, None)
             if color is None:
@@ -105,31 +151,48 @@ for storey_idx, (env_storey, structure_storey) in enumerate(zip(env_storeys[10:1
                 continue 
             o3d_mesh = mesh.as_open3d
             type_name = element.ObjectType.split(':')[0]
-            # print(element.ObjectType, mesh.body_count)
             
             # color = element_colors.get(type_name, None)
             # if color is None:
             #     continue
             
-            # check elevation
-            z_coords = np.asarray(o3d_mesh.vertices)[:, 2]
-            min_elev, max_elev = np.min(z_coords), np.max(z_coords)
-            if max_elev < target_elev:
+            if elem_type == 'IfcSlab':
+                color = slab_elements.get(element.ObjectType, None)
+            elif elem_type == 'IfcWallStandardCase':
+                color = wall_elements.get(element.ObjectType, None)
+            if color is None:
                 continue
+            
+            # print(element.ObjectType, elem_type, pair_idx)
+            # check elevation
+            # z_coords = np.asarray(o3d_mesh.vertices)[:, 2]
+            # min_elev, max_elev = np.min(z_coords), np.max(z_coords)
+            # if max_elev < target_elev:
+            #     continue
             o3d_mesh.compute_vertex_normals()
             o3d_mesh.paint_uniform_color(np.array(color)/255.0)
             storey_mesh += o3d_mesh
             
             o3d_mesh_list.append(('S{}_E{}.ply'.format(storey_idx, element_idx), o3d_mesh))
             
+            # TODO: extract planes from primitives
+            tri_mesh_list.append(mesh)
             # sample_pcd = o3d_mesh.sample_points_uniformly(number_of_points=2000, use_triangle_normal=True)
             # o3d.visualization.draw_geometries([o3d_mesh])
-
 
 structure_vertices = np.asarray(storey_mesh.vertices)
 vertices_centroid = np.mean(structure_vertices, axis = 0)
 structure_vertices -= vertices_centroid
+mesh_plane_list, new_mesh_list = model_plane_extraction(tri_mesh_list, vertices_centroid)
+
+with open(os.path.join(root_path, 'BIM_plane_objects', 'model_plane_objects.pkl'), 'wb') as f:
+    pickle.dump(mesh_plane_list, f)
+
+for idx, mesh in enumerate(new_mesh_list):
+    with open(os.path.join(root_path, 'BIM_plane_objects', 'mesh_models', '{}.ply'.format(str(idx).zfill(4))), 'wb') as f:
+        f.write(trimesh.exchange.ply.export_ply(mesh))
 storey_mesh.vertices = o3d.utility.Vector3dVector(structure_vertices)
+o3d.visualization.draw_geometries([storey_mesh])
 
 # for mesh_info in o3d_mesh_list:
 #     vertices = np.asarray(mesh_info[1].vertices)
@@ -139,8 +202,7 @@ storey_mesh.vertices = o3d.utility.Vector3dVector(structure_vertices)
     #             os.path.join(root_path, 'plane_estimation', 'mesh_data', mesh_info[0]),
     #             mesh_info[1]
     #         )
-    
-o3d.visualization.draw_geometries([storey_mesh])
+
 # o3d.io.write_triangle_mesh(os.path.join(root_path, 'plane_estimation', 'plane_data', 'filtered_structure.ply'), 
 #                            storey_mesh,
 #                            write_vertex_colors=True)
