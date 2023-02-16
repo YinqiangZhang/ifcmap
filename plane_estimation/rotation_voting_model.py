@@ -12,6 +12,8 @@ import numpy as np
 from utils.primitive_registor import PrimitiveRegistor
 from scipy.spatial.transform import Rotation as R
 import matplotlib.pyplot as plt
+from sklearn.cluster import DBSCAN
+import trimesh
 
 
 def online_clustering(association_dict, cos_thres=0.99, angle_thres=0.05):
@@ -70,10 +72,14 @@ model_mesh_filepaths = glob.glob(os.path.join(model_mesh_folder, '*.ply'))
 # load selected BIM model
 o3d_model_mesh = o3d.geometry.TriangleMesh()
 model_mesh_list = list()
+model_trimesh_list = list()
+model_plane_params = list()
 for mesh_path in model_mesh_filepaths:
     model_mesh = o3d.io.read_triangle_mesh(mesh_path)
+    model_trimesh = trimesh.load(mesh_path)
     model_mesh.compute_vertex_normals()
     model_mesh_list.append(model_mesh)
+    model_trimesh_list.append(model_trimesh)
     o3d_model_mesh += model_mesh
 
 '''
@@ -107,7 +113,7 @@ for idx, plane in enumerate(target_planes):
 
 source_points.paint_uniform_color(np.array([65, 105, 225])/255)
 target_points.paint_uniform_color(np.array([218, 165, 32])/255)
-o3d.visualization.draw_geometries([source_points, target_points])
+# o3d.visualization.draw_geometries([source_points, target_points])
 
 '''
 Here,
@@ -135,22 +141,22 @@ for target_idx, target_param in enumerate(target_params_list):
 
 cluster_info = online_clustering(association_dict, 0.99, 0.05)
 
-fig = plt.figure(figsize=(8, 6))
-ax = fig.add_subplot(projection='3d')
-u, v = np.mgrid[0:2 * np.pi:30j, 0:np.pi:20j]
-x = np.cos(u) * np.sin(v)
-y = np.sin(u) * np.sin(v)
-z = np.cos(v)
-ax.plot_wireframe(x, y, z, edgecolor="k", linewidth=0.5)
-for idx, (vectors, _, _) in enumerate(cluster_info[:3]):
-    ax.scatter(vectors[:, 0], vectors[:, 1], vectors[:, 2], s=20, alpha=0.5)
-    print('Label: {}, size: {}'.format(idx, vectors.shape[0]))
-ax.set_box_aspect((1, 1, 0.9))
-# ax.set_xticks([])
-# ax.set_yticks([])
-# ax.set_zticks([])
-# plt.axis('off')
-plt.show()
+# fig = plt.figure(figsize=(8, 6))
+# ax = fig.add_subplot(projection='3d')
+# u, v = np.mgrid[0:2 * np.pi:30j, 0:np.pi:20j]
+# x = np.cos(u) * np.sin(v)
+# y = np.sin(u) * np.sin(v)
+# z = np.cos(v)
+# ax.plot_wireframe(x, y, z, edgecolor="k", linewidth=0.5)
+# for idx, (vectors, _, _) in enumerate(cluster_info[:3]):
+#     ax.scatter(vectors[:, 0], vectors[:, 1], vectors[:, 2], s=20, alpha=0.5)
+#     print('Label: {}, size: {}'.format(idx, vectors.shape[0]))
+# ax.set_box_aspect((1, 1, 0.9))
+# # ax.set_xticks([])
+# # ax.set_yticks([])
+# # ax.set_zticks([])
+# # plt.axis('off')
+# plt.show()
 
 rot_mat_list = list()
 association_list = list()
@@ -169,16 +175,74 @@ for association_pair in association_list[0]:
         optimization_pairs[target_idx] = [source_idx]
     else:
         optimization_pairs[target_idx].append(source_idx)
-    # dws_target_points = target_points_list[target_idx]
-    # dws_source_points = source_points_list[source_idx]
-    # source_planes = model_plane_list[source_idx]
-    # plane_params = np.vstack((np.atleast_2d(source_planes[0]), np.atleast_2d(source_planes[1])))
-    # dws_points = np.asarray(dws_target_points.points)
-    # homo_points = np.column_stack((dws_points, np.ones((dws_points.shape[0], 1))))
-    # Q_matrix = np.matmul(homo_points.T, homo_points)
-    # optimization_pair.append([Q_matrix, plane_params, dws_points.shape[0]])
-    # o3d.visualization.draw_geometries([dws_target_points, dws_source_points])
-    
+        
+# merged_optimization_pairs = dict()
+# for target_idx, pairs in optimization_pairs.items():
+#     d_list = list()
+#     for plane_pair in pairs:
+#         plane_params = np.vstack(model_plane_list[plane_pair])
+#         d_list.append(np.abs(plane_params[:, -1]).mean())
+#     clustering = DBSCAN(eps=0.5, min_samples=1).fit(np.atleast_2d(np.array(d_list)).T)
+#     merged_pair_list = list()
+#     for label in np.unique(clustering.labels_):
+#         merged_pair_list.append(np.array(pairs)[clustering.labels_ == label])
+#     merged_optimization_pairs[target_idx] = merged_pair_list
+
+# association matrix
+# target_relation_graph = dict()
+# target_indices = list(merged_optimization_pairs.keys())
+# for j, idx_j in enumerate(target_indices):
+#     for k, idx_k in enumerate(target_indices[j+1:], j+1):
+#         plane_param_j = target_params_list[idx_j]
+#         plane_param_k = target_params_list[idx_k]
+#         similarity = np.abs(np.dot(plane_param_j[:, :-1], plane_param_k[:, :-1].T)).item()
+#         target_relation_graph[idx_j, idx_k] = np.arccos(similarity) * 180.0 / np.pi 
+#         target_relation_graph[idx_k, idx_j] = np.arccos(similarity) * 180.0 / np.pi 
+        
+# for target_idx, merged_pairs in merged_optimization_pairs.items():
+#     points = np.asarray(target_points_list[target_idx].points)
+#     homo_points = np.column_stack((points, np.ones((points.shape[0], 1))))
+
+# source_relation_graph = dict()
+# for idx_j in range(len(model_plane_list)):
+#     for idx_k in range(j+1, len(model_plane_list)):
+#         plane_param_j = model_plane_list[idx_j]
+#         plane_param_k = model_plane_list[idx_k]
+#         similarity = min(np.abs(np.dot(plane_param_j[0][:-1], plane_param_k[0][:-1])), 1.0)
+#         source_relation_graph[idx_j, idx_k] = np.arccos(similarity) * 180.0 / np.pi 
+#         source_relation_graph[idx_k, idx_j] = np.arccos(similarity) * 180.0 / np.pi 
+
+# curr_association = association_list[0]
+# for pair in curr_association:
+#     target_idx, source_idx = association_pair
+#     model_trimesh = model_trimesh_list[source_idx]
+#     obj_plane_params = model_plane_params[source_idx]
+#     points = np.asarray(target_points_list[target_idx].points)
+#     pass 
+
+# consistency_matrix = dict()
+# for idx_j, pair_j in enumerate(curr_association):
+#     for idx_k, pair_k in enumerate(curr_association[idx_j+1:], idx_j+1):
+#         target_idx_j, source_idx_j = pair_j
+#         target_idx_k, source_idx_k = pair_k
+        
+#         if target_idx_j != target_idx_k:
+#             target_relation = target_relation_graph[target_idx_j, target_idx_k]
+#             print('Target ({}, {}): {}'.format(target_idx_j, target_idx_k, target_relation))
+#         if source_idx_j != source_idx_k:
+#             source_relation = source_relation_graph[source_idx_j, source_idx_k]
+#             print('Source ({}, {}): {}'.format(source_idx_j, source_idx_k, source_relation))
+            
+#         if target_idx_j == target_idx_k and source_relation < 10.0:
+#             consistency_matrix[idx_j, idx_k] = 1
+#         elif source_idx_j == source_idx_k and target_relation < 10.0:
+#             consistency_matrix[idx_j, idx_k] = 1
+#         elif np.abs(target_relation - source_relation) < 10.0:
+#             consistency_matrix[idx_j, idx_k] = 1
+#         else:
+#             consistency_matrix[idx_j, idx_k] = 0
+#         pass
+
 # for target_idx, pairs in optimization_pairs.items():
 #     all_points = o3d.geometry.PointCloud()
 #     all_meshs = o3d.geometry.TriangleMesh()
@@ -189,35 +253,72 @@ for association_pair in association_list[0]:
 #             points.paint_uniform_color(np.array([205, 92, 92])/255)
 #         all_points += points
 #     for idx, mesh in enumerate(copy.deepcopy(model_mesh_list)):
-#         if idx in pairs:
+#         if idx in pairs[:1]:
 #             mesh.paint_uniform_color(np.array([205, 92, 92])/255)
 #         else:
 #             mesh.paint_uniform_color(np.array([105, 105, 105])/255)
 #         all_meshs += mesh
 #     o3d.visualization.draw_geometries([all_points, all_meshs])
-    
+
 # TODO: RANSAC-based correspondence selection
-
-
-registor = PrimitiveRegistor(model_mesh_list, model_plane_list, target_points_list, association_list[0][:2])
-result_trans = registor.optimize()
-registor.visualize()
+registor = PrimitiveRegistor(model_trimesh_list, model_plane_list, target_points_list, [])
+for target_idx, pair_list in optimization_pairs.items():
+    average_V_list = list()
+    result_trans_list = list()
+    for idx, source_idx in enumerate(pair_list):
+        correspondence = (target_idx, source_idx)
+        registor.add_correspondence(correspondence)
+        if idx == 0:
+            registor.set_damping()
+        result_trans, _ = registor.optimize()
+        average_V_list.append(registor.get_average_potential())
+        result_trans_list.append(result_trans)
+        registor.remove_correspondence()
+        print('Index: {}, Total V: {}'.format(correspondence, average_V_list[-1]))
+    
+    best_idx = np.argmin(average_V_list)
+    if (average_V_list[best_idx] < 0.03):
+        registor.add_correspondence((target_idx, pair_list[best_idx]))
+        print('Current correspondences: {}'.format(registor.correspondence_list))
+        best_trans = result_trans_list[best_idx]
+        # aligned_points = copy.deepcopy(target_points)
+        # aligned_points.transform(result_trans_list[best_idx])
+        # o3d.visualization.draw_geometries([aligned_points, o3d_model_mesh])
+        
+# for idx in range(len(association_list[0])):
+#     registor.add_correspondence(association_list[0][idx])
+#     result_trans, _ = registor.optimize()
+#     average_V = registor.get_average_potential()
+#     print('Index: {}, Total V: {}'.format(idx, average_V))
+#     all_points = o3d.geometry.PointCloud()
+#     all_meshs = o3d.geometry.TriangleMesh()
+#     for j, points in enumerate(copy.deepcopy(target_points_list)):
+#         if j != association_list[0][idx][0]:
+#             points.paint_uniform_color(np.array([105, 105, 105])/255)
+#         else:
+#             points.paint_uniform_color(np.array([205, 92, 92])/255)
+#         all_points += points
+#     for k, mesh in enumerate(copy.deepcopy(model_mesh_list)):
+#         if k == association_list[0][idx][1]:
+#             mesh.paint_uniform_color(np.array([205, 92, 92])/255)
+#         else:
+#             mesh.paint_uniform_color(np.array([218, 165, 32])/255)
+#         all_meshs += mesh
+#     if average_V > 0.03:
+#         registor.remove_correspondence()
+#         print('Current correspondences: {}'.format(registor.correspondence_list))
+#     else:
+#         print('Current correspondences: {}'.format(registor.correspondence_list))
+#         registor.visualize()
+#         all_points.transform(result_trans)
+#         o3d.visualization.draw_geometries([all_points, all_meshs])
 
 # point-to-plane distances (normalized)
 # initial results by rotation voting
 initial_alignment_points = copy.deepcopy(target_points)
 # initial_alignment_points.rotate(rot_mat_list[0].as_matrix())
-initial_alignment_points.transform(result_trans)
+initial_alignment_points.transform(best_trans)
 initial_alignment_points.paint_uniform_color(np.array([218, 165, 32])/255)
-
-'''
-Here,
-Fine-level registration
-'''
-# reg_p2l = o3d.pipelines.registration.registration_icp(
-#     initial_alignment_points, source_points, 0.1, np.identity(4),
-#     o3d.pipelines.registration.TransformationEstimationPointToPlane())
-# initial_alignment_points.transform(reg_p2l.transformation)
 
 vis = o3d.visualization.Visualizer()
 vis.create_window()
