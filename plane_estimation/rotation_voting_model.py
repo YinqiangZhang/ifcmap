@@ -8,12 +8,12 @@ import open3d as o3d
 import matplotlib.pyplot as plt 
 import matplotlib as mpl
 import numpy as np
-# from utils.plane_factor_optimizer import PlaneFactorOptimizer
 from utils.primitive_registor import PrimitiveRegistor
 from scipy.spatial.transform import Rotation as R
 import matplotlib.pyplot as plt
 from sklearn.cluster import DBSCAN
 import trimesh
+from multiprocessing import Pool
 
 
 def online_clustering(association_dict, cos_thres=0.99, angle_thres=0.05):
@@ -108,7 +108,8 @@ for idx, plane in enumerate(target_planes):
     o3d_points.normals = o3d.utility.Vector3dVector(
         np.repeat(plane.plane_params[:, :-1], plane.points.shape[0], axis=0)
         )
-    target_points_list.append(o3d_points)
+    tri_points = trimesh.PointCloud(vertices=plane.points)
+    target_points_list.append(tri_points)
     target_points += o3d_points
 
 source_points.paint_uniform_color(np.array([65, 105, 225])/255)
@@ -140,23 +141,6 @@ for target_idx, target_param in enumerate(target_params_list):
             norm_list = np.vstack((norm_list, np.atleast_2d(axis_vec)))
 
 cluster_info = online_clustering(association_dict, 0.99, 0.05)
-
-# fig = plt.figure(figsize=(8, 6))
-# ax = fig.add_subplot(projection='3d')
-# u, v = np.mgrid[0:2 * np.pi:30j, 0:np.pi:20j]
-# x = np.cos(u) * np.sin(v)
-# y = np.sin(u) * np.sin(v)
-# z = np.cos(v)
-# ax.plot_wireframe(x, y, z, edgecolor="k", linewidth=0.5)
-# for idx, (vectors, _, _) in enumerate(cluster_info[:3]):
-#     ax.scatter(vectors[:, 0], vectors[:, 1], vectors[:, 2], s=20, alpha=0.5)
-#     print('Label: {}, size: {}'.format(idx, vectors.shape[0]))
-# ax.set_box_aspect((1, 1, 0.9))
-# # ax.set_xticks([])
-# # ax.set_yticks([])
-# # ax.set_zticks([])
-# # plt.axis('off')
-# plt.show()
 
 rot_mat_list = list()
 association_list = list()
@@ -261,29 +245,34 @@ for association_pair in association_list[0]:
 #     o3d.visualization.draw_geometries([all_points, all_meshs])
 
 # TODO: RANSAC-based correspondence selection
-registor = PrimitiveRegistor(model_trimesh_list, model_plane_list, target_points_list, [])
+used_source_indices = set()
+registor = PrimitiveRegistor(model_trimesh_list, target_points_list, [])
 for target_idx, pair_list in optimization_pairs.items():
     average_V_list = list()
     result_trans_list = list()
-    for idx, source_idx in enumerate(pair_list):
+    state_list = list()
+    valid_pair_list = list(idx for idx in pair_list if idx not in used_source_indices)
+    for idx, source_idx in enumerate(valid_pair_list):
         correspondence = (target_idx, source_idx)
         registor.add_correspondence(correspondence)
-        if idx == 0:
-            registor.set_damping()
+        registor.set_damping()
         result_trans, _ = registor.optimize()
         average_V_list.append(registor.get_average_potential())
+        state_list.append(copy.deepcopy(registor.state))
         result_trans_list.append(result_trans)
         registor.remove_correspondence()
         print('Index: {}, Total V: {}'.format(correspondence, average_V_list[-1]))
     
     best_idx = np.argmin(average_V_list)
     if (average_V_list[best_idx] < 0.03):
-        registor.add_correspondence((target_idx, pair_list[best_idx]))
+        registor.add_correspondence((target_idx, valid_pair_list[best_idx]))
+        used_source_indices.add(valid_pair_list[best_idx])
+        registor.state = state_list[best_idx]
         print('Current correspondences: {}'.format(registor.correspondence_list))
         best_trans = result_trans_list[best_idx]
-        # aligned_points = copy.deepcopy(target_points)
-        # aligned_points.transform(result_trans_list[best_idx])
-        # o3d.visualization.draw_geometries([aligned_points, o3d_model_mesh])
+        aligned_points = copy.deepcopy(target_points)
+        aligned_points.transform(result_trans_list[best_idx])
+        o3d.visualization.draw_geometries([aligned_points, o3d_model_mesh])
         
 # for idx in range(len(association_list[0])):
 #     registor.add_correspondence(association_list[0][idx])
@@ -316,7 +305,6 @@ for target_idx, pair_list in optimization_pairs.items():
 # point-to-plane distances (normalized)
 # initial results by rotation voting
 initial_alignment_points = copy.deepcopy(target_points)
-# initial_alignment_points.rotate(rot_mat_list[0].as_matrix())
 initial_alignment_points.transform(best_trans)
 initial_alignment_points.paint_uniform_color(np.array([218, 165, 32])/255)
 
