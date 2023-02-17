@@ -20,7 +20,8 @@ class PrimitiveRegistor():
         self.damping = 1.0
         self.s_damping = 0.1
         self.time_step = 0.3
-        self.iteration_num = 750
+        self.iteration_num = 1000
+        self.sample_num = 20
         
         self.state = np.zeros((13,))
         self.centroid = None
@@ -99,7 +100,10 @@ class PrimitiveRegistor():
         dws_primitive_list = list()
         for tri_pcd in self.primitive_list:
             # ratio = 0.001 if len(pcd.points) > 500 else 2/len(pcd.points)
-            points = np.asarray(tri_pcd.vertices[np.random.choice(np.arange(len(tri_pcd.vertices)), 15, replace=False)])
+            # o3d_pcd = o3d.geometry.PointCloud()
+            # o3d_pcd.points = o3d.utility.Vector3dVector(tri_pcd.vertices)
+            # points = np.asarray(o3d_pcd.farthest_point_down_sample(self.sample_num).points)
+            points = np.asarray(tri_pcd.vertices[np.random.choice(np.arange(len(tri_pcd.vertices)), self.sample_num, replace=False)])
             dws_primitive_list.append(points)
         return dws_primitive_list
     

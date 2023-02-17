@@ -10,7 +10,7 @@ from tqdm import tqdm
 from multiprocessing import Pool
 from utils.primitive_registor import PrimitiveRegistor
 
-
+# TODO: exchange the name of source and target
 def opt_agent(data):
     mesh_list, points_list, correspondences, state = data
     registor = PrimitiveRegistor(mesh_list, points_list, correspondences)
@@ -21,6 +21,23 @@ def opt_agent(data):
     average_V = registor.get_average_potential()
     # print('Index: {}, Average V: {}'.format(correspondences[-1], average_V))
     return (result_trans, average_V, registor.state)
+
+def rough_correspondence_generating(mesh_list, point_list):
+    correspondence_dict = dict()
+    correspondence_num = 0
+    for points_idx, points in enumerate(point_list):
+        for mesh_idx, mesh in enumerate(mesh_list):
+            mesh_area = mesh.area
+            points_approx_area = points.convex_hull.area
+            if points_approx_area > 5 * mesh_area:
+                continue
+            correspondence_num += 1
+            if correspondence_dict.get(points_idx, None) is None:
+                correspondence_dict[points_idx] = [mesh_idx]
+            else:
+                correspondence_dict[points_idx].append(mesh_idx)
+    print('Reduction rate: {:.2f} %'.format(correspondence_num / (len(point_list)*len(mesh_list)) * 100))
+    return correspondence_dict
 
 if __name__ == '__main__':
     
@@ -86,34 +103,9 @@ if __name__ == '__main__':
     source_points.paint_uniform_color(np.array([65, 105, 225])/255)
     target_points.paint_uniform_color(np.array([218, 165, 32])/255)
     # o3d.visualization.draw_geometries([source_points, target_points])
-
-    '''
-    Here,
-    Association dict will be extracted. 
-    '''
-    association_dict = dict()
-    norm_list = np.array([])
-    for target_idx, target_param in enumerate(target_params_list):
-        for source_idx, source_param in enumerate(source_params_list):
-            target_norm = target_param[0, :-1] if target_param[0, 0] > 0 else -target_param[0, :-1]
-            source_norm = source_param[0, :-1] if source_param[0, 0] > 0 else -source_param[0, :-1]
-            axis_vec = np.cross(target_norm, source_norm)
-            axis_norm = np.linalg.norm(axis_vec)
-            axis_vec /= axis_norm
-            association_dict[target_idx, source_idx] = np.append(axis_vec, axis_norm)
-            if norm_list.shape[0] == 0:
-                norm_list = np.atleast_2d(axis_vec)
-            else:
-                norm_list = np.vstack((norm_list, np.atleast_2d(axis_vec)))
-        
-    # TODO: analyze association pairs
-    optimization_pairs = dict()
-    for association_pair in association_dict.keys():
-        target_idx, source_idx = association_pair
-        if optimization_pairs.get(target_idx, None) is None:
-            optimization_pairs[target_idx] = [source_idx]
-        else:
-            optimization_pairs[target_idx].append(source_idx)
+    
+    # exhausted searching the point clouds from large to small
+    optimization_pairs = rough_correspondence_generating(model_trimesh_list, target_points_list)
     
     # record computation time
     start_time = time.time()

@@ -1,0 +1,6 @@
+k: 20
+damping: 1.0
+s_damping: 0.1
+time_step: 0.3
+iteration_num: 1000
+sample_num: 20
