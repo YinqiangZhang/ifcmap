@@ -193,8 +193,8 @@ class PrimitiveRegistor():
     def compute_system_energy(self, spring_energy):
         vbar = np.atleast_2d(self.state[7:10])
         omega = np.atleast_2d(self.state[10:])
-        Vk = spring_energy.shape[0]/2 * np.dot(vbar, vbar.T) + 0.5 * (omega @ self.J @ omega.T)
-        Vp = spring_energy.sum() / (2 * self.k)
+        Vk = 0.5 * spring_energy.shape[0] * np.dot(vbar, vbar.T) + 0.5 * (omega @ self.J @ omega.T)
+        Vp = 0.5 * spring_energy.sum() / self.k
         V_total = Vk + Vp
         return Vp.item(), Vk.item(), V_total.item()
     

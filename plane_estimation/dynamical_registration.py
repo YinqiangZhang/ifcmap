@@ -107,7 +107,6 @@ if __name__ == '__main__':
     # exhausted searching the point clouds from large to small
     optimization_pairs = rough_correspondence_generating(model_trimesh_list, target_points_list)
     
-    # record computation time
     start_time = time.time()
     inliers = list()
     curr_state = None
@@ -145,10 +144,5 @@ if __name__ == '__main__':
     
     with open(os.path.join(model_folder, 'inliers.pkl'), 'wb') as f:
         pickle.dump(inliers, f)
+        pickle.dump(best_trans, f)
         
-    vis = o3d.visualization.Visualizer()
-    vis.create_window()
-    vis.add_geometry(o3d_model_mesh)
-    vis.add_geometry(initial_alignment_points)
-    vis.run()
-    vis.destroy_window()

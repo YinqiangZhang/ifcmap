@@ -140,11 +140,13 @@ for plane in sorted_filter_plane_data:
 #     ground_connected_indices.update(connected_indices)
 # target_planes = list(plane for idx, plane in enumerate(filtered_plane_data) if idx in ground_connected_indices)
 
-target_indices = [0, 1, 2, 4, 5, 6, 8, 9, 10, 11, 13, 14, 15, 16, 20, 22, 25, 26, 27, 31, 32, 33, 35, 36, 39, 40, 42, 43]
+# target_indices = [0, 1, 2, 4, 5, 6, 8, 9, 10, 11, 13, 14, 15, 16, 20, 22, 25, 26, 27, 31, 32, 33, 35, 36, 39, 40, 42, 43]
+target_indices = list(range(100))
 target_planes = list(plane_obj for idx, plane_obj in enumerate(filtered_plane_data) if idx in target_indices)
 with open(os.path.join(plane_folder, 'selected_plane_objects.pkl'), 'wb') as f:
     pickle.dump(target_planes, f)
 # visualization
+# target_planes = filtered_plane_data
 cmap_norm = mpl.colors.Normalize(vmin=0.0, vmax=len(target_planes))
 visalized_points = o3d.geometry.PointCloud()
 random.shuffle(target_planes)

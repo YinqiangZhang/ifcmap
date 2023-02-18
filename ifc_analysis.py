@@ -71,7 +71,7 @@ unitfactor = getunitfactor(ifc_env_model) # millimeter
 # }
 
 color_dict = {
-    # 'IfcColumn': [106, 90, 205],
+    'IfcColumn': [106, 90, 205],
     # 'IfcSite': 	[65, 105, 225],
     # 'IfcRamp': [60, 179, 113], 
     # 'IfcFlowTerminal': [255, 215, 0],

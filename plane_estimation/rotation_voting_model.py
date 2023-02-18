@@ -114,7 +114,7 @@ for idx, plane in enumerate(target_planes):
 
 source_points.paint_uniform_color(np.array([65, 105, 225])/255)
 target_points.paint_uniform_color(np.array([218, 165, 32])/255)
-# o3d.visualization.draw_geometries([source_points, target_points])
+o3d.visualization.draw_geometries([source_points, target_points])
 
 '''
 Here,
