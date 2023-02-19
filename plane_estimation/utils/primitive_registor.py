@@ -20,8 +20,8 @@ class PrimitiveRegistor():
         self.damping = 1.0
         self.s_damping = 0.1
         self.time_step = 0.3
-        self.iteration_num = 1000
-        self.sample_num = 20
+        self.iteration_num = 300
+        self.sample_num = 15
         
         self.state = np.zeros((13,))
         self.centroid = None
@@ -43,8 +43,8 @@ class PrimitiveRegistor():
 
         self.state[:3] = self.centroid
         self.state[3:7] = np.array([0, 0, 0, 1.0])
-        self.state[7:10] = 0.001*np.random.randn(3)
-        self.state[10:] = 0.001*np.random.randn(3)
+        self.state[7:10] = 0.0
+        self.state[10:] = 0.0
     
     def get_moment_inertia(self, ref_points):
         curr_J = np.zeros((3, 3))
@@ -80,8 +80,8 @@ class PrimitiveRegistor():
         point_mass = 0
         for idx in target_indices:
             point_mass += self.dws_primitives[idx].shape[0]
-        self.damping = 1.0 * np.sqrt(point_mass/25)
-        self.s_damping = 0.1 * np.sqrt(point_mass/25)
+        self.damping = self.damping * np.sqrt(point_mass/25)
+        self.s_damping = self.s_damping * np.sqrt(point_mass/25)
         
     def add_correspondence(self, correspondence):
         self.correspondence_list.append(correspondence)
@@ -99,11 +99,10 @@ class PrimitiveRegistor():
     def primitive_downsample(self):
         dws_primitive_list = list()
         for tri_pcd in self.primitive_list:
-            # ratio = 0.001 if len(pcd.points) > 500 else 2/len(pcd.points)
-            # o3d_pcd = o3d.geometry.PointCloud()
-            # o3d_pcd.points = o3d.utility.Vector3dVector(tri_pcd.vertices)
-            # points = np.asarray(o3d_pcd.farthest_point_down_sample(self.sample_num).points)
-            points = np.asarray(tri_pcd.vertices[np.random.choice(np.arange(len(tri_pcd.vertices)), self.sample_num, replace=False)])
+            o3d_pcd = o3d.geometry.PointCloud()
+            o3d_pcd.points = o3d.utility.Vector3dVector(tri_pcd.vertices)
+            sample_num = max(int(len(o3d_pcd.points) / 100000 * self.sample_num), self.sample_num)
+            points = np.asarray(o3d_pcd.farthest_point_down_sample(sample_num).points)
             dws_primitive_list.append(points)
         return dws_primitive_list
     
@@ -117,8 +116,8 @@ class PrimitiveRegistor():
         self.history_state = self.state
         self.history_states = list()
         self.history_V = list()
-        self.state[7:10] = 0.0
-        self.state[10:] = 0.0
+        self.state[7:10] = 0.0 * np.random.randn(3)
+        self.state[10:] = 0.0 * np.random.randn(3)
         for n_iter in range(self.iteration_num):
             s_dot, spring_energy = self.dynamics()
             _, _, V_total = self.compute_system_energy(spring_energy)
@@ -126,9 +125,9 @@ class PrimitiveRegistor():
             self.state[3:7] = self.state[3:7] / np.linalg.norm(self.state[3:7])
             self.history_states.append(copy.deepcopy(self.state))
             self.history_V.append(V_total)
-            if np.linalg.norm(s_dot) < 0.01:
+            if np.linalg.norm(s_dot) < 0.005:
                 break
-        # print(n_iter)
+        print(n_iter)
 
         result_trans = np.identity(4)
         rot_mat = R.from_quat(self.state[3:7]).as_matrix()
@@ -161,13 +160,12 @@ class PrimitiveRegistor():
         spring_energy = list()
         for idx in range(len(self.dws_primitives)):
             sum_forces = np.zeros_like(self.dws_primitives[idx])
-            sum_energy = np.zeros((sum_forces.shape[0], 1))
             if composite_force_dict.get(idx, None) is not None:
                 force_list = composite_force_dict[idx]
                 sum_forces = np.stack(force_list, axis=2).sum(axis=2)
                 sum_energy = np.atleast_2d(np.square(np.stack(force_list, axis=2)).sum(axis=(1, 2))).T
+                spring_energy.append(sum_energy)
             force_vectors.append(sum_forces)
-            spring_energy.append(sum_energy)
         force_vectors = np.vstack(force_vectors)
         spring_energy = np.vstack(spring_energy)
         # dynamic equations
@@ -190,11 +188,36 @@ class PrimitiveRegistor():
         s_dot[10:] = np.squeeze(domega) / np.linalg.norm(domega) * min(np.linalg.norm(domega), 10)
         return s_dot, spring_energy
     
+    # def evaluate_potential_energy(self, target_trans):
+    #     rot = target_trans[:-1, :-1]
+    #     xbar = target_trans[:-1, -1] + np.squeeze(rot @ np.atleast_2d(self.centroid).T)
+        
+    #     composite_force_dict = dict()
+    #     for primitive_idx, model_idx in self.correspondence_list:
+    #         mesh_query = self.mesh_query_list[model_idx]
+    #         primitive_points = np.matmul(rot, self.ref_points_list[primitive_idx].T).T + xbar
+    #         _, forces = self.get_hausdorff_projective_points(mesh_query, primitive_points)
+    #         if composite_force_dict.get(primitive_idx, None) is None:
+    #             composite_force_dict[primitive_idx] = [forces]
+    #         else:
+    #             composite_force_dict[primitive_idx].append(forces)
+        
+    #     spring_energy = list()
+    #     for idx in range(len(self.dws_primitives)):
+    #         sum_energy = np.zeros((self.dws_primitives[idx].shape[0], 1))
+    #         if composite_force_dict.get(idx, None) is not None:
+    #             force_list = composite_force_dict[idx]
+    #             sum_energy = np.atleast_2d(np.square(np.stack(force_list, axis=2)).sum(axis=(1, 2))).T
+    #         spring_energy.append(sum_energy)
+    #     spring_energy = np.vstack(spring_energy)
+    #     return 0.5 * spring_energy.sum() / self.k
+    
     def compute_system_energy(self, spring_energy):
         vbar = np.atleast_2d(self.state[7:10])
         omega = np.atleast_2d(self.state[10:])
-        Vk = 0.5 * spring_energy.shape[0] * np.dot(vbar, vbar.T) + 0.5 * (omega @ self.J @ omega.T)
-        Vp = 0.5 * spring_energy.sum() / self.k
+        Vk = 0.5 * self.ref_points.shape[0] * np.dot(vbar, vbar.T) + 0.5 * (omega @ self.J @ omega.T)
+        # Vp = 0.5 * spring_energy.sum() / self.k
+        Vp = 0.5 * np.percentile(spring_energy, 75)/self.k * spring_energy.shape[0]
         V_total = Vk + Vp
         return Vp.item(), Vk.item(), V_total.item()
     
@@ -209,7 +232,9 @@ class PrimitiveRegistor():
     
     def get_hausdorff_projective_points(self, mesh_query, points):
         projected_points, _, _ = mesh_query.on_surface(points)
+        # signed_distances = mesh_query.signed_distance(points)
         force_vectors = projected_points - points
+        # force_vectors[signed_distances>0] = np.zeros_like(force_vectors[signed_distances>0])
         return projected_points, force_vectors
     
     def get_signed_distance(self, plane_params, primitive_points):

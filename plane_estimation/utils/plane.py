@@ -31,7 +31,7 @@ class PlaneCandidate():
         self.mu = self.mu0
         for out_idx in range(10):
             in_idx = 0
-            while True:
+            for _ in range(100):
                 self.plane_params, cost = self.plane_estimate(weight_update=True)
                 self.weights = self.GM_weight_estimate()
                 self.inliers = self.inliner_estimate()                
