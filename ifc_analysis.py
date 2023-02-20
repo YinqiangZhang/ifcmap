@@ -112,8 +112,8 @@ wall_elements = {
     # '基本墙:JCT-A-WAL-RC-225mm': [135, 206, 235], # blue 
     '基本墙:JCT-A-WAL-RC-150mm': [85, 107, 47],
     # '基本墙:JCT-A-WAL-RC-200mm': [205, 133, 63],
-    # '基本墙:JCT-A-WAL-RC-100mm': [255, 99, 71],
-    # '基本墙:JCT-A-WAL-Block Wall_100mm': [186, 85, 211], 
+    '基本墙:JCT-A-WAL-RC-100mm': [255, 99, 71],
+    '基本墙:JCT-A-WAL-Block Wall_100mm': [186, 85, 211], 
     # '基本墙:JCT-A-WAL-partition-100mm':[255, 222, 173], 
     # '基本墙:JCT-A-WAL-partition-25mm': [171, 130, 255], 
     # '基本墙:JCT-A-WAL-partition-80mm': [238, 122, 233], 

@@ -4,45 +4,56 @@ import copy
 import glob
 import pickle
 import trimesh
-import argparse
 import numpy as np 
 import open3d as o3d 
 from tqdm import tqdm
 from multiprocessing import Pool
-from scipy.spatial.transform import Rotation as R
-from utils.registration_utils import (get_model_meshes, 
-                                      rough_correspondence_generating, 
-                                      get_real_points, 
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+from utils.registration_utils import (rough_correspondence_generating, 
                                       opt_agent)
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Select target model:')
-    parser.add_argument('--index', type=int, default=0, help='Model Index')
-    args = parser.parse_args()
     # read segmented planes
     root_path = os.path.dirname(os.path.abspath(__file__))
-    data_folder = os.path.join(root_path, 'CaseStudy')
-    model_folder = os.path.join(data_folder, 'CaseStudyModels')
-    segment_folder = os.path.join(data_folder, 'CaseStudySegments')
+    data_folder = os.path.join(root_path, 'RealData')
+    model_folder = os.path.join(data_folder, 'mesh_models')
+    segment_folder = data_folder
     
     model_paths = glob.glob(os.path.join(model_folder, '*.ply'))
-    segments_paths = [glob.glob(os.path.join(segment_folder, folder, '*.ply')) \
-                      for folder in os.listdir(segment_folder)]
+    with open(os.path.join(segment_folder, 'selected_plane_objects.pkl'), 'rb') as f:
+        target_planes = pickle.load(f)
     
-    # set a init random transformation matrix
-    case_index = args.index
-    axis_angle_rep = np.array([np.pi/24, np.pi/6, np.pi/30])
-    r = R.from_rotvec(axis_angle_rep)
-    init_trans = np.identity(4)
-    init_trans[:-1, :-1] = r.as_matrix()
-    init_trans[:-1, -1] = np.array([-10.0, -10.0, -2.0])
-    model_meshes, o3d_mesh = get_model_meshes(model_paths[case_index:case_index+1])
-    real_points, o3d_real_points, scene_pcd = get_real_points(segments_paths[case_index:case_index+1], init_trans)
+    model_meshes = list()
+    o3d_model_mesh = o3d.geometry.TriangleMesh()
+    for model_path in model_paths:
+        model_mesh = trimesh.load_mesh(model_path)
+        o3d_mesh = o3d.io.read_triangle_mesh(model_path)
+        o3d_mesh.compute_vertex_normals()
+        model_meshes.append(model_mesh)
+        o3d_model_mesh += o3d_mesh
     
-    target_meshes = model_meshes[0]
-    target_points = real_points[0][:50]
-    o3d.visualization.draw_geometries([o3d_mesh, scene_pcd])
+    real_points = list()
+    o3d_real_points = list()
+    scene_pcd = o3d.geometry.PointCloud()
+    cmap_norm = mpl.colors.Normalize(vmin=0.0, vmax=len(target_planes))
+    for idx, plane in enumerate(target_planes):
+        o3d_points = o3d.geometry.PointCloud()
+        o3d_points.points = o3d.utility.Vector3dVector(plane.points)
+        o3d_points.normals = o3d.utility.Vector3dVector(
+            np.repeat(plane.plane_params[:, :-1], plane.points.shape[0], axis=0)
+            )
+        color = plt.get_cmap('nipy_spectral')(cmap_norm(idx))[0:3]
+        o3d_points.paint_uniform_color(color)
+        tri_points = trimesh.PointCloud(vertices=plane.points)
+        real_points.append(tri_points)
+        o3d_real_points.append(o3d_points)
+        scene_pcd += o3d_points
+    
+    target_meshes = model_meshes
+    target_points = real_points[:50]
+    o3d.visualization.draw_geometries([scene_pcd, o3d_model_mesh])
     optimization_pairs = rough_correspondence_generating(target_meshes, target_points)
     
     start_time = time.time()
@@ -76,14 +87,14 @@ if __name__ == '__main__':
             print('\n Current correspondences: {}'.format(inliers))
             # aligned_pcd = copy.deepcopy(scene_pcd)
             # aligned_pcd.transform(best_trans)
-            # o3d.visualization.draw_geometries([aligned_pcd, o3d_mesh])
+            # o3d.visualization.draw_geometries([aligned_pcd, o3d_model_mesh])
     
     print('Total computation time: {} s'.format(time.time() - start_time))
     
-    with open(os.path.join(data_folder, f'CaseStudy{case_index}_inliers.pkl'), 'wb') as f:
+    with open(os.path.join(data_folder, 'inliers.pkl'), 'wb') as f:
         pickle.dump(inliers, f)
         pickle.dump(best_trans, f)
     
     aligned_pcd = copy.deepcopy(scene_pcd)
     aligned_pcd.transform(best_trans)
-    o3d.visualization.draw_geometries([aligned_pcd, o3d_mesh])
+    o3d.visualization.draw_geometries([aligned_pcd, o3d_model_mesh])

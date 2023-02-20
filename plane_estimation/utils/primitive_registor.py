@@ -21,7 +21,7 @@ class PrimitiveRegistor():
         self.s_damping = 0.1
         self.time_step = 0.3
         self.iteration_num = 300
-        self.sample_num = 15
+        self.sample_num = 20
         
         self.state = np.zeros((13,))
         self.centroid = None
@@ -232,9 +232,9 @@ class PrimitiveRegistor():
     
     def get_hausdorff_projective_points(self, mesh_query, points):
         projected_points, _, _ = mesh_query.on_surface(points)
-        # signed_distances = mesh_query.signed_distance(points)
+        signed_distances = mesh_query.signed_distance(points)
         force_vectors = projected_points - points
-        # force_vectors[signed_distances>0] = np.zeros_like(force_vectors[signed_distances>0])
+        force_vectors[signed_distances>0] = np.zeros_like(force_vectors[signed_distances>0])
         return projected_points, force_vectors
     
     def get_signed_distance(self, plane_params, primitive_points):

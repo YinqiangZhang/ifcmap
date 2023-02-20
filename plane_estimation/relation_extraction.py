@@ -145,6 +145,8 @@ target_indices = list(range(100))
 target_planes = list(plane_obj for idx, plane_obj in enumerate(filtered_plane_data) if idx in target_indices)
 with open(os.path.join(plane_folder, 'selected_plane_objects.pkl'), 'wb') as f:
     pickle.dump(target_planes, f)
+
+
 # visualization
 # target_planes = filtered_plane_data
 cmap_norm = mpl.colors.Normalize(vmin=0.0, vmax=len(target_planes))
