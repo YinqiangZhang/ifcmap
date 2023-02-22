@@ -1,20 +1,21 @@
 import copy 
-import scipy
-import trimesh
 import numpy as np
 import open3d as o3d
 from scipy.spatial.transform import Rotation as R
 import matplotlib.pyplot as plt 
 from trimesh.proximity import ProximityQuery
 
+
 class PrimitiveRegistor():
-    def __init__(self, model_meshes, primitives, correspondences):
+    def __init__(self, model_meshes, primitives, correspondences, s_dot_threshold = 0.001):
         self.model_list = model_meshes
         self.primitive_list = primitives
         self.correspondence_list = correspondences
         
         self.history_states = list()
         self.history_V = list()
+        self.point_pairs = list()
+        self.record_pair_lineset = True
         
         self.k = 20
         self.damping = 1.0
@@ -22,6 +23,7 @@ class PrimitiveRegistor():
         self.time_step = 0.3
         self.iteration_num = 300
         self.sample_num = 20
+        self.s_dot_threshold = s_dot_threshold
         
         self.state = np.zeros((13,))
         self.centroid = None
@@ -125,8 +127,9 @@ class PrimitiveRegistor():
             self.state[3:7] = self.state[3:7] / np.linalg.norm(self.state[3:7])
             self.history_states.append(copy.deepcopy(self.state))
             self.history_V.append(V_total)
-            if np.linalg.norm(s_dot) < 0.005:
+            if np.linalg.norm(s_dot) < self.s_dot_threshold:
                 break
+        # self.dynamics_illusatration()
         print(n_iter)
 
         result_trans = np.identity(4)
@@ -146,10 +149,13 @@ class PrimitiveRegistor():
         
         # generate vector forces
         composite_force_dict = dict()
+        self.point_pairs = list()
         for primitive_idx, model_idx in self.correspondence_list:
             mesh_query = self.mesh_query_list[model_idx]
             primitive_points = np.matmul(rot, self.ref_points_list[primitive_idx].T).T + xbar
-            _, forces = self.get_hausdorff_projective_points(mesh_query, primitive_points)
+            projected_points, forces = self.get_hausdorff_projective_points(mesh_query, primitive_points)
+            if self.record_pair_lineset:
+                self.point_pairs.append((projected_points, primitive_points))
             if composite_force_dict.get(primitive_idx, None) is None:
                 composite_force_dict[primitive_idx] = [forces]
             else:
@@ -187,30 +193,6 @@ class PrimitiveRegistor():
         s_dot[7:10] = acc_bar / np.linalg.norm(acc_bar) * min(np.linalg.norm(acc_bar), 1000)
         s_dot[10:] = np.squeeze(domega) / np.linalg.norm(domega) * min(np.linalg.norm(domega), 10)
         return s_dot, spring_energy
-    
-    # def evaluate_potential_energy(self, target_trans):
-    #     rot = target_trans[:-1, :-1]
-    #     xbar = target_trans[:-1, -1] + np.squeeze(rot @ np.atleast_2d(self.centroid).T)
-        
-    #     composite_force_dict = dict()
-    #     for primitive_idx, model_idx in self.correspondence_list:
-    #         mesh_query = self.mesh_query_list[model_idx]
-    #         primitive_points = np.matmul(rot, self.ref_points_list[primitive_idx].T).T + xbar
-    #         _, forces = self.get_hausdorff_projective_points(mesh_query, primitive_points)
-    #         if composite_force_dict.get(primitive_idx, None) is None:
-    #             composite_force_dict[primitive_idx] = [forces]
-    #         else:
-    #             composite_force_dict[primitive_idx].append(forces)
-        
-    #     spring_energy = list()
-    #     for idx in range(len(self.dws_primitives)):
-    #         sum_energy = np.zeros((self.dws_primitives[idx].shape[0], 1))
-    #         if composite_force_dict.get(idx, None) is not None:
-    #             force_list = composite_force_dict[idx]
-    #             sum_energy = np.atleast_2d(np.square(np.stack(force_list, axis=2)).sum(axis=(1, 2))).T
-    #         spring_energy.append(sum_energy)
-    #     spring_energy = np.vstack(spring_energy)
-    #     return 0.5 * spring_energy.sum() / self.k
     
     def compute_system_energy(self, spring_energy):
         vbar = np.atleast_2d(self.state[7:10])
@@ -269,3 +251,30 @@ class PrimitiveRegistor():
         plt.show()
         plt.close()
         
+    def dynamics_illusatration(self):
+        key_points_set = o3d.geometry.PointCloud()
+        ancher_points_set = o3d.geometry.PointCloud()
+        plane_points_set = o3d.geometry.PointCloud()
+        line_set_list = list()
+        for idx, (primitive_idx, model_idx) in enumerate(self.correspondence_list):
+            key_points = o3d.geometry.PointCloud()
+            ancher_points = o3d.geometry.PointCloud()
+            plane_points = o3d.geometry.PointCloud()
+            point_pairs, mesh_model = self.point_pairs[idx], self.model_list[model_idx]
+            correspndence_set = list((num, num) for num in range(point_pairs[0].shape[0]))
+            plane_points.points  = o3d.utility.Vector3dVector(np.asarray(self.primitive_list[primitive_idx].vertices))
+            ancher_points.points = o3d.utility.Vector3dVector(point_pairs[0])
+            key_points.points = o3d.utility.Vector3dVector(point_pairs[1])
+            corres_lines = o3d.geometry.LineSet.create_from_point_cloud_correspondences(ancher_points, 
+                                                                                        key_points, 
+                                                                                        correspndence_set)
+            line_set_list.append(corres_lines)
+            key_points_set += key_points
+            ancher_points_set += ancher_points
+            plane_points_set += plane_points
+            
+        plane_points_set.paint_uniform_color(np.array([65, 105, 225])/255)
+        ancher_points_set.paint_uniform_color(np.array([255, 48, 48])/255)
+        key_points_set.paint_uniform_color(np.array([138, 43, 226])/255)
+        point_list = [plane_points_set, ancher_points_set, key_points_set]
+        o3d.visualization.draw_geometries(corres_lines.extend(point_list))

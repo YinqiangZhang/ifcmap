@@ -23,8 +23,8 @@ def set_material():
     mat_bim.base_reflectance = 0.0
     mat_bim.base_clearcoat = 1.0
     mat_bim.thickness = 1.0
-    mat_bim.transmission = 1.0
-    mat_bim.absorption_distance = 10
+    mat_bim.transmission = 0.4
+    mat_bim.absorption_distance = 1
     mat_bim.absorption_color = [0.1, 0.1, 0.2]
     return mat_bim
 
