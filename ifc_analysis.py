@@ -114,18 +114,20 @@ wall_elements = {
     # '基本墙:JCT-A-WAL-RC-200mm': [205, 133, 63],
     '基本墙:JCT-A-WAL-RC-100mm': [255, 99, 71],
     '基本墙:JCT-A-WAL-Block Wall_100mm': [186, 85, 211], 
-    # '基本墙:JCT-A-WAL-partition-100mm':[255, 222, 173], 
+    '基本墙:JCT-A-WAL-partition-100mm':[255, 222, 173], 
     # '基本墙:JCT-A-WAL-partition-25mm': [171, 130, 255], 
     # '基本墙:JCT-A-WAL-partition-80mm': [238, 122, 233], 
     # '基本墙:JCT-C-SWL-RC-150mm': [255, 69, 0], orange rectangular 
 }
 
 target_elev = 58780.0 / unitfactor
-storey_mesh = o3d.geometry.TriangleMesh()
+building_mesh = o3d.geometry.TriangleMesh()
+storey_mesh_list = list()
 o3d_mesh_list = list()
 tri_mesh_list = list()
 
-for storey_idx, (env_storey, structure_storey) in enumerate(zip(env_storeys[10:11], structure_storeys[10:11])):
+for storey_idx, (env_storey, structure_storey) in enumerate(zip(env_storeys[10:12], structure_storeys[10:12])):
+    storey_mesh = o3d.geometry.TriangleMesh()
     env_elev = get_storey_elevation(env_storey)
     structure_elev = get_storey_elevation(structure_storey)
     
@@ -171,28 +173,31 @@ for storey_idx, (env_storey, structure_storey) in enumerate(zip(env_storeys[10:1
             #     continue
             o3d_mesh.compute_vertex_normals()
             o3d_mesh.paint_uniform_color(np.array(color)/255.0)
+            building_mesh += o3d_mesh
             storey_mesh += o3d_mesh
-            
-            o3d_mesh_list.append(('S{}_E{}.ply'.format(storey_idx, element_idx), o3d_mesh))
+            # o3d_mesh_list.append(('S{}_E{}.ply'.format(storey_idx, element_idx), o3d_mesh))
             
             # TODO: extract planes from primitives
             tri_mesh_list.append(mesh)
             # sample_pcd = o3d_mesh.sample_points_uniformly(number_of_points=2000, use_triangle_normal=True)
-            # o3d.visualization.draw_geometries([o3d_mesh])
+            o3d.visualization.draw_geometries([o3d_mesh])
 
-structure_vertices = np.asarray(storey_mesh.vertices)
+structure_vertices = np.asarray(building_mesh.vertices)
 vertices_centroid = np.mean(structure_vertices, axis = 0)
 structure_vertices -= vertices_centroid
 mesh_plane_list, new_mesh_list = model_plane_extraction(tri_mesh_list, vertices_centroid)
 
-with open(os.path.join(root_path, 'BIM_plane_objects', 'model_plane_objects.pkl'), 'wb') as f:
-    pickle.dump(mesh_plane_list, f)
+with open(os.path.join(root_path, 'BIM_plane_objects', 'initial_translation.pkl'), 'wb') as f:
+    pickle.dump(vertices_centroid, f)
 
-for idx, mesh in enumerate(new_mesh_list):
-    with open(os.path.join(root_path, 'BIM_plane_objects', 'mesh_models', '{}.ply'.format(str(idx).zfill(4))), 'wb') as f:
-        f.write(trimesh.exchange.ply.export_ply(mesh))
-storey_mesh.vertices = o3d.utility.Vector3dVector(structure_vertices)
-o3d.visualization.draw_geometries([storey_mesh])
+# with open(os.path.join(root_path, 'BIM_plane_objects', 'model_plane_objects.pkl'), 'wb') as f:
+#     pickle.dump(mesh_plane_list, f)
+
+# for idx, mesh in enumerate(new_mesh_list):
+#     with open(os.path.join(root_path, 'BIM_plane_objects', 'mesh_models', '{}.ply'.format(str(idx).zfill(4))), 'wb') as f:
+#         f.write(trimesh.exchange.ply.export_ply(mesh))
+building_mesh.vertices = o3d.utility.Vector3dVector(structure_vertices)
+o3d.visualization.draw_geometries([building_mesh])
 
 # for mesh_info in o3d_mesh_list:
 #     vertices = np.asarray(mesh_info[1].vertices)
@@ -204,7 +209,7 @@ o3d.visualization.draw_geometries([storey_mesh])
     #         )
 
 # o3d.io.write_triangle_mesh(os.path.join(root_path, 'plane_estimation', 'plane_data', 'filtered_structure.ply'), 
-#                            storey_mesh,
+#                            building_mesh,
 #                            write_vertex_colors=True)
 
             # face_normals = mesh.face_normals

@@ -8,7 +8,7 @@ from utils.primitive_registor import PrimitiveRegistor
 
 def opt_agent(data):
     mesh_list, points_list, correspondences, state = data
-    registor = PrimitiveRegistor(mesh_list, points_list, correspondences)
+    registor = PrimitiveRegistor(mesh_list, points_list, correspondences, 0.005)
     if state is not None:
         registor.state = state
     registor.set_damping()

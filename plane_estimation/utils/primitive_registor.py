@@ -18,10 +18,12 @@ class PrimitiveRegistor():
         self.record_pair_lineset = True
         
         self.k = 20
-        self.damping = 1.0
-        self.s_damping = 0.1
+        self.damping_c = 1.0
+        self.s_damping_c = 0.1
+        self.damping = self.damping_c
+        self.s_damping = self.s_damping_c
         self.time_step = 0.3
-        self.iteration_num = 300
+        self.iteration_num = 600
         self.sample_num = 20
         self.s_dot_threshold = s_dot_threshold
         
@@ -33,6 +35,7 @@ class PrimitiveRegistor():
         
         self.dws_primitives = self.primitive_downsample()
         self.mesh_query_list = self.generate_mesh_query()
+        self.o3d_mesh_list = self.get_o3d_meshes()
         self.initial_state()
         
     def initial_state(self):
@@ -82,8 +85,8 @@ class PrimitiveRegistor():
         point_mass = 0
         for idx in target_indices:
             point_mass += self.dws_primitives[idx].shape[0]
-        self.damping = self.damping * np.sqrt(point_mass/25)
-        self.s_damping = self.s_damping * np.sqrt(point_mass/25)
+        self.damping = 1.0 * np.sqrt(point_mass/25)
+        self.s_damping = 0.1 * np.sqrt(point_mass/25)
         
     def add_correspondence(self, correspondence):
         self.correspondence_list.append(correspondence)
@@ -97,6 +100,7 @@ class PrimitiveRegistor():
         self.primitive_list = primitives
         self.mesh_query_list = self.generate_mesh_query()
         self.dws_primitives = self.primitive_downsample()
+        self.o3d_mesh_list = self.get_o3d_meshes()
     
     def primitive_downsample(self):
         dws_primitive_list = list()
@@ -114,13 +118,22 @@ class PrimitiveRegistor():
             mesh_query_list.append(ProximityQuery(mesh))
         return mesh_query_list
     
-    def optimize(self):
+    def get_o3d_meshes(self):
+        o3d_mesh_list = list()
+        for mesh in self.model_list:
+            o3d_mesh = mesh.as_open3d
+            o3d_mesh.compute_vertex_normals()
+            o3d_mesh_list.append(o3d_mesh)
+        return o3d_mesh_list
+    
+    def optimize(self, total_iter_num=None):
+        total_iter_num = self.iteration_num if total_iter_num is None else total_iter_num
         self.history_state = self.state
-        self.history_states = list()
-        self.history_V = list()
-        self.state[7:10] = 0.0 * np.random.randn(3)
-        self.state[10:] = 0.0 * np.random.randn(3)
-        for n_iter in range(self.iteration_num):
+        # self.history_states = list()
+        # self.history_V = list()
+        self.state[7:10] = 0.0
+        self.state[10:] = 0.0
+        for n_iter in range(total_iter_num):
             s_dot, spring_energy = self.dynamics()
             _, _, V_total = self.compute_system_energy(spring_energy)
             self.state = self.state + self.time_step * s_dot
@@ -129,14 +142,15 @@ class PrimitiveRegistor():
             self.history_V.append(V_total)
             if np.linalg.norm(s_dot) < self.s_dot_threshold:
                 break
-        # self.dynamics_illusatration()
         print(n_iter)
-
+        return self.get_transformation_matrix(), V_total
+    
+    def get_transformation_matrix(self):
         result_trans = np.identity(4)
         rot_mat = R.from_quat(self.state[3:7]).as_matrix()
         result_trans[:-1, :-1] = rot_mat
         result_trans[:-1, -1] = self.state[:3] - np.squeeze(rot_mat @ np.atleast_2d(self.centroid).T)
-        return result_trans, V_total
+        return result_trans
     
     def dynamics(self):
         # extend different variables
@@ -251,30 +265,24 @@ class PrimitiveRegistor():
         plt.show()
         plt.close()
         
-    def dynamics_illusatration(self):
+    def get_inlier_lineset(self):
         key_points_set = o3d.geometry.PointCloud()
         ancher_points_set = o3d.geometry.PointCloud()
-        plane_points_set = o3d.geometry.PointCloud()
-        line_set_list = list()
-        for idx, (primitive_idx, model_idx) in enumerate(self.correspondence_list):
+        line_set = o3d.geometry.LineSet()
+        for idx, _ in enumerate(self.correspondence_list):
             key_points = o3d.geometry.PointCloud()
             ancher_points = o3d.geometry.PointCloud()
-            plane_points = o3d.geometry.PointCloud()
-            point_pairs, mesh_model = self.point_pairs[idx], self.model_list[model_idx]
+            point_pairs = self.point_pairs[idx]
             correspndence_set = list((num, num) for num in range(point_pairs[0].shape[0]))
-            plane_points.points  = o3d.utility.Vector3dVector(np.asarray(self.primitive_list[primitive_idx].vertices))
             ancher_points.points = o3d.utility.Vector3dVector(point_pairs[0])
             key_points.points = o3d.utility.Vector3dVector(point_pairs[1])
             corres_lines = o3d.geometry.LineSet.create_from_point_cloud_correspondences(ancher_points, 
                                                                                         key_points, 
                                                                                         correspndence_set)
-            line_set_list.append(corres_lines)
+            line_set += corres_lines
             key_points_set += key_points
             ancher_points_set += ancher_points
-            plane_points_set += plane_points
-            
-        plane_points_set.paint_uniform_color(np.array([65, 105, 225])/255)
         ancher_points_set.paint_uniform_color(np.array([255, 48, 48])/255)
         key_points_set.paint_uniform_color(np.array([138, 43, 226])/255)
-        point_list = [plane_points_set, ancher_points_set, key_points_set]
-        o3d.visualization.draw_geometries(corres_lines.extend(point_list))
+        line_set.paint_uniform_color(np.array([255, 0, 0])/255)
+        return [line_set, ancher_points_set, key_points_set]

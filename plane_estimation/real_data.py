@@ -10,8 +10,7 @@ from tqdm import tqdm
 from multiprocessing import Pool
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from utils.registration_utils import (rough_correspondence_generating, 
-                                      opt_agent)
+from utils.registration_utils import (rough_correspondence_generating, opt_agent)
 
 
 if __name__ == '__main__':
@@ -69,7 +68,7 @@ if __name__ == '__main__':
             curr_inliers = copy.deepcopy(inliers)
             curr_inliers.append(correspondence)
             data_list.append((target_meshes, target_points, curr_inliers, curr_state))
-        pool_num = len(data_list) if len(data_list) < int(os.cpu_count()/2) else int(os.cpu_count())
+        pool_num = len(data_list) if len(data_list) < int(os.cpu_count()) else int(os.cpu_count())
         with Pool(pool_num) as p:
             result_list = p.map(opt_agent, data_list)
             

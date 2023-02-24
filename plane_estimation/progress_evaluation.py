@@ -110,7 +110,7 @@ if __name__ == '__main__':
         vertex_points = np.asarray(mesh.vertices)
         mesh_grid = mesh.voxelized(0.27)
         obb = o3d.geometry.OrientedBoundingBox.create_from_points(o3d.utility.Vector3dVector(vertex_points))
-        search_box = o3d.geometry.OrientedBoundingBox(obb.center, obb.R, obb.extent + 0.2)
+        search_box = o3d.geometry.OrientedBoundingBox(obb.center, obb.R, obb.extent + 0.05)
         cropped_pcd = aligned_raw_pcd.crop(search_box)
         for point_idx, point in enumerate(np.asarray(cropped_pcd.points)):
             [k, idx, _] = pcd_tree.search_knn_vector_3d(point, 1)
@@ -134,16 +134,16 @@ if __name__ == '__main__':
     built_model.paint_uniform_color(np.array([102, 205, 0])/256)
     unbuilt_model.paint_uniform_color(np.array([255, 48, 48])/256)
         
-    # built_mat_bim = set_material(np.array([0, 255, 0])/256)
-    # unbuilt_mat_bim = set_material(np.array([255, 48, 48])/256)
-    # geoms = [{'name': 'built_bim_model', 'geometry': built_model, 'material': built_mat_bim}, 
-    #         {'name': 'unbuilt_bim_model', 'geometry': unbuilt_model, 'material': unbuilt_mat_bim}, 
-    #         # {'name': 'built_pcd', 'geometry': built_pcd},
-    #         # {'name': 'unbuilt_pcd', 'geometry': unbuilt_pcd},
-    #         ]
-    # vis.draw(geoms,
-    #         bg_color=(1.0, 1.0, 1.0, 1.0),
-    #         show_ui=True,
-    #         width=1920,
-    #         height=1080)
-    o3d.visualization.draw_geometries([o3d_model_mesh, built_pcd, unbuilt_pcd, ])# built_model, unbuilt_model
+    built_mat_bim = set_material(np.array([0, 255, 0])/256)
+    unbuilt_mat_bim = set_material(np.array([255, 48, 48])/256)
+    geoms = [{'name': 'built_bim_model', 'geometry': built_model, 'material': built_mat_bim}, 
+            {'name': 'unbuilt_bim_model', 'geometry': unbuilt_model, 'material': unbuilt_mat_bim}, 
+            # {'name': 'built_pcd', 'geometry': built_pcd},
+            # {'name': 'unbuilt_pcd', 'geometry': unbuilt_pcd},
+            ]
+    vis.draw(geoms,
+            bg_color=(1.0, 1.0, 1.0, 1.0),
+            show_ui=True,
+            width=1920,
+            height=1080)
+    # o3d.visualization.draw_geometries([o3d_model_mesh, built_pcd, unbuilt_pcd, ])# built_model, unbuilt_model
