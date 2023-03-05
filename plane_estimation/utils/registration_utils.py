@@ -12,7 +12,7 @@ def opt_agent(data):
     if state is not None:
         registor.state = state
     registor.set_damping()
-    result_trans, _ = registor.optimize()
+    result_trans, _, _ = registor.optimize()
     average_V = registor.get_average_potential()
     print('Index: {}, Average V: {}'.format(correspondences[-1], average_V))
     return (result_trans, average_V, registor.state)

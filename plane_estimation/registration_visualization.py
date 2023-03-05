@@ -1,6 +1,7 @@
 import os 
 import glob
 import copy
+import time
 import random
 import pickle
 import trimesh
@@ -36,34 +37,21 @@ def set_material(color):
     mat_bim.absorption_color = [color[0], color[1], color[2]]
     return mat_bim
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Select target model:')
-    parser.add_argument('--index', type=int, default=0, help='Model Index')
-    parser.add_argument('--aligned', type=bool, default=True, help='If use aligned points')
-    parser.add_argument('--vis', type=bool, default=False, help='If use visualization')
-    args = parser.parse_args()
-    
-    use_aligned = args.aligned
-    has_visualization = args.vis 
+def main():
     # read segmented planes
     root_path = os.path.dirname(os.path.abspath(__file__))
     data_folder = os.path.join(root_path, 'RealData')
     model_folder = os.path.join(data_folder, 'simplified_mesh_models')
     segment_folder = data_folder
-    
-    raw_pcd = o3d.io.read_point_cloud(os.path.join(data_folder, 'raw_map.ply'))
-    
     with open(os.path.join(segment_folder, 'simplified_inliers.pkl'), 'rb') as f:
         inliers = pickle.load(f)
         best_trans = pickle.load(f)
-    
     with open(os.path.join(segment_folder, 'initial_translation.pkl'), 'rb') as f:
         initial_translation = pickle.load(f)
-        
     model_paths = glob.glob(os.path.join(model_folder, '*.ply'))
     with open(os.path.join(segment_folder, 'selected_plane_objects.pkl'), 'rb') as f:
         target_planes = pickle.load(f)
-    
+
     model_meshes = list()
     o3d_model_mesh = o3d.geometry.TriangleMesh()
     for model_path in model_paths:
@@ -72,13 +60,13 @@ if __name__ == '__main__':
         o3d_mesh.compute_vertex_normals()
         model_meshes.append(model_mesh)
         o3d_model_mesh += o3d_mesh
-    
+
     real_points = list()
     o3d_real_points = list()
     scene_pcd = o3d.geometry.PointCloud()
     cmap_norm = mpl.colors.Normalize(vmin=0.0, vmax=len(target_planes))
     plane_indices = list(range(len(target_planes)))
-    # random.shuffle(plane_indices)
+    random.shuffle(plane_indices)
     for idx, plane in zip(plane_indices, target_planes):
         o3d_points = o3d.geometry.PointCloud()
         o3d_points.points = o3d.utility.Vector3dVector(plane.points)
@@ -91,46 +79,49 @@ if __name__ == '__main__':
         real_points.append(tri_points)
         o3d_real_points.append(o3d_points)
         scene_pcd += o3d_points
-    
-    if use_aligned:
-        aligned_pcd = copy.deepcopy(scene_pcd).transform(best_trans)
-        aligned_raw_pcd = copy.deepcopy(raw_pcd).transform(best_trans)
-    else:
-        aligned_pcd = scene_pcd
-        aligned_raw_pcd = raw_pcd
-        
+
+    camera_parameters = o3d.io.read_pinhole_camera_parameters(os.path.join(root_path, 'configs', 'new_video_configs.json'))
+    vis = o3d.visualization.Visualizer()
+    vis.create_window(window_name='Registration', 
+                    width=960, 
+                    height=540, 
+                    left=0, 
+                    top=0, 
+                    visible=True)
+    # vis.add_geometry(scene_pcd)
+    # vis.add_geometry(o3d_model_mesh)
+    # vis.get_view_control().convert_from_pinhole_camera_parameters(camera_parameters)
+    # vis.get_render_option().load_from_json(os.path.join(root_path, 'configs', 'render_opt.json'))
+    # vis.run()
+    img_count = 0
     registor = PrimitiveRegistor(model_meshes, real_points, [], 0.005)
     for idx, inlier in enumerate(inliers):
         registor.add_correspondence(inlier)
         registor.set_damping()
-        for value in [1, 600]:
-            result_trans, total_V = registor.optimize(total_iter_num=value)
+        for n_iter in range(600):
+            result_trans, total_V, is_done = registor.optimize(total_iter_num=5)
             average_V = registor.get_average_potential()
-            vis_data = registor.get_inlier_lineset()
+            line_set, ancher_points_set, key_points_set = registor.get_inlier_lineset()
             print('Add Inlier: {}, Total V: {}, Average V: {}'.format(inlier, total_V, average_V))
             aligned_pcd = copy.deepcopy(scene_pcd).transform(result_trans)
-            vis_data.extend([o3d_model_mesh, aligned_pcd])
-            o3d.visualization.draw_geometries(vis_data)
-    
-    # registor = PrimitiveRegistor(model_meshes, real_points, inliers, 0.005)
-    # result_trans, total_V = registor.optimize()
-    # average_V = registor.get_average_potential()
-    # vis_data = registor.get_inlier_lineset()
-    # print('Total V: {}, Average V: {}'.format(total_V, average_V))
-    # aligned_pcd = copy.deepcopy(scene_pcd).transform(result_trans)
-    # vis_data.extend([o3d_model_mesh, aligned_pcd])
-    # o3d.visualization.draw_geometries(vis_data)
-    
-    # built_mat_bim = set_material(np.array([0, 255, 0])/256)
-    # unbuilt_mat_bim = set_material(np.array([255, 48, 48])/256)
-    # geoms = [{'name': 'built_bim_model', 'geometry': built_model, 'material': built_mat_bim}, 
-    #         {'name': 'unbuilt_bim_model', 'geometry': unbuilt_model, 'material': unbuilt_mat_bim}, 
-    #         # {'name': 'built_pcd', 'geometry': built_pcd},
-    #         # {'name': 'unbuilt_pcd', 'geometry': unbuilt_pcd},
-    #         ]
-    # vis.draw(geoms,
-    #         bg_color=(1.0, 1.0, 1.0, 1.0),
-    #         show_ui=True,
-    #         width=1920,
-    #         height=1080)
+            vis.clear_geometries()
+            vis.add_geometry(line_set)
+            vis.add_geometry(ancher_points_set)
+            vis.add_geometry(key_points_set)
+            vis.add_geometry(aligned_pcd)
+            vis.add_geometry(o3d_model_mesh)
+            vis.get_view_control().convert_from_pinhole_camera_parameters(camera_parameters)
+            vis.get_render_option().load_from_json(os.path.join(root_path, 'configs', 'render_opt.json'))
+            vis.update_renderer()
+            vis.poll_events()
+            # image = vis.capture_screen_float_buffer(False)
+            # plt.imsave(os.path.join(root_path, 'video_figs', "{:05d}.png".format(img_count)), np.asarray(image))
+            img_count += 1
+            if is_done:
+                break
+        registor.reset_to_still()
+
+
+if __name__ == '__main__':
+    main()
     

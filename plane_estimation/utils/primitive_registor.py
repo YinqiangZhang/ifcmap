@@ -1,6 +1,7 @@
-import copy 
+import copy
 import numpy as np
 import open3d as o3d
+from pysdf import SDF
 from scipy.spatial.transform import Rotation as R
 import matplotlib.pyplot as plt 
 from trimesh.proximity import ProximityQuery
@@ -23,7 +24,7 @@ class PrimitiveRegistor():
         self.damping = self.damping_c
         self.s_damping = self.s_damping_c
         self.time_step = 0.3
-        self.iteration_num = 600
+        self.iteration_num = 1500
         self.sample_num = 20
         self.s_dot_threshold = s_dot_threshold
         
@@ -33,6 +34,7 @@ class PrimitiveRegistor():
         self.ref_points_list = None
         self.J = None
         
+        self.mesh_sdf_list = self.generate_sdf_list()
         self.dws_primitives = self.primitive_downsample()
         self.mesh_query_list = self.generate_mesh_query()
         self.o3d_mesh_list = self.get_o3d_meshes()
@@ -73,6 +75,13 @@ class PrimitiveRegistor():
                      )
         return np.matmul(A, np.atleast_2d(b).T)
     
+    def generate_sdf_list(self):
+        mesh_sdf_list = list()
+        for model in self.model_list:
+            model_sdf = SDF(model.vertices, model.faces)
+            mesh_sdf_list.append(model_sdf)
+        return mesh_sdf_list
+    
     def set_correspondence(self, correspondence_list):
         self.correspondence_list = correspondence_list
         
@@ -81,12 +90,13 @@ class PrimitiveRegistor():
         for correspondence_pair in self.correspondence_list:
             target_idx, _ = correspondence_pair
             target_indices.add(target_idx)
-        
         point_mass = 0
         for idx in target_indices:
             point_mass += self.dws_primitives[idx].shape[0]
         self.damping = 1.0 * np.sqrt(point_mass/25)
         self.s_damping = 0.1 * np.sqrt(point_mass/25)
+        # TODO: should be improved later for much faster
+        # self.iteration_num = max(100, int(600 * np.sqrt(25/point_mass)))
         
     def add_correspondence(self, correspondence):
         self.correspondence_list.append(correspondence)
@@ -126,13 +136,16 @@ class PrimitiveRegistor():
             o3d_mesh_list.append(o3d_mesh)
         return o3d_mesh_list
     
+    def reset_to_still(self):
+        self.state[7:10] = 0.0
+        self.state[10:] = 0.0
+    
     def optimize(self, total_iter_num=None):
+        is_done = False
         total_iter_num = self.iteration_num if total_iter_num is None else total_iter_num
         self.history_state = self.state
         # self.history_states = list()
         # self.history_V = list()
-        self.state[7:10] = 0.0
-        self.state[10:] = 0.0
         for n_iter in range(total_iter_num):
             s_dot, spring_energy = self.dynamics()
             _, _, V_total = self.compute_system_energy(spring_energy)
@@ -141,9 +154,11 @@ class PrimitiveRegistor():
             self.history_states.append(copy.deepcopy(self.state))
             self.history_V.append(V_total)
             if np.linalg.norm(s_dot) < self.s_dot_threshold:
+                is_done = True
                 break
         print(n_iter)
-        return self.get_transformation_matrix(), V_total
+        self.reset_to_still()
+        return self.get_transformation_matrix(), V_total, is_done
     
     def get_transformation_matrix(self):
         result_trans = np.identity(4)
@@ -165,9 +180,11 @@ class PrimitiveRegistor():
         composite_force_dict = dict()
         self.point_pairs = list()
         for primitive_idx, model_idx in self.correspondence_list:
-            mesh_query = self.mesh_query_list[model_idx]
             primitive_points = np.matmul(rot, self.ref_points_list[primitive_idx].T).T + xbar
-            projected_points, forces = self.get_hausdorff_projective_points(mesh_query, primitive_points)
+            # mesh_query = self.mesh_query_list[model_idx]
+            # projected_points, forces = self.get_hausdorff_projective_points(mesh_query, primitive_points)
+            mesh_sdf = self.mesh_sdf_list[model_idx]
+            projected_points, forces = self.get_sdf_distance_gradient(mesh_sdf, primitive_points)
             if self.record_pair_lineset:
                 self.point_pairs.append((projected_points, primitive_points))
             if composite_force_dict.get(primitive_idx, None) is None:
@@ -231,6 +248,18 @@ class PrimitiveRegistor():
         signed_distances = mesh_query.signed_distance(points)
         force_vectors = projected_points - points
         force_vectors[signed_distances>0] = np.zeros_like(force_vectors[signed_distances>0])
+        return projected_points, force_vectors
+    
+    def get_sdf_distance_gradient(self, mesh_sdf, points):
+        delta = 0.002
+        sd_0 = mesh_sdf(points)
+        sd_x_shift = mesh_sdf(points + [delta, 0.0, 0.0])
+        sd_y_shift = mesh_sdf(points + [0.0, delta, 0.0])
+        sd_z_shift = mesh_sdf(points + [0.0, 0.0, delta])
+        gradients = np.array([sd_x_shift-sd_0, sd_y_shift-sd_0, sd_z_shift-sd_0])
+        force_vectors = -(gradients/np.linalg.norm(gradients, axis=0) * sd_0).T
+        force_vectors[sd_0>0] = np.zeros_like(force_vectors[sd_0>0])
+        projected_points = points + force_vectors
         return projected_points, force_vectors
     
     def get_signed_distance(self, plane_params, primitive_points):

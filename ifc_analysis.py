@@ -126,7 +126,7 @@ storey_mesh_list = list()
 o3d_mesh_list = list()
 tri_mesh_list = list()
 
-for storey_idx, (env_storey, structure_storey) in enumerate(zip(env_storeys[10:12], structure_storeys[10:12])):
+for storey_idx, (env_storey, structure_storey) in enumerate(zip(env_storeys[:], structure_storeys[:])):
     storey_mesh = o3d.geometry.TriangleMesh()
     env_elev = get_storey_elevation(env_storey)
     structure_elev = get_storey_elevation(structure_storey)
@@ -180,15 +180,15 @@ for storey_idx, (env_storey, structure_storey) in enumerate(zip(env_storeys[10:1
             # TODO: extract planes from primitives
             tri_mesh_list.append(mesh)
             # sample_pcd = o3d_mesh.sample_points_uniformly(number_of_points=2000, use_triangle_normal=True)
-            o3d.visualization.draw_geometries([o3d_mesh])
+            # o3d.visualization.draw_geometries([o3d_mesh])
 
 structure_vertices = np.asarray(building_mesh.vertices)
 vertices_centroid = np.mean(structure_vertices, axis = 0)
 structure_vertices -= vertices_centroid
 mesh_plane_list, new_mesh_list = model_plane_extraction(tri_mesh_list, vertices_centroid)
 
-with open(os.path.join(root_path, 'BIM_plane_objects', 'initial_translation.pkl'), 'wb') as f:
-    pickle.dump(vertices_centroid, f)
+# with open(os.path.join(root_path, 'BIM_plane_objects', 'initial_translation.pkl'), 'wb') as f:
+#     pickle.dump(vertices_centroid, f)
 
 # with open(os.path.join(root_path, 'BIM_plane_objects', 'model_plane_objects.pkl'), 'wb') as f:
 #     pickle.dump(mesh_plane_list, f)

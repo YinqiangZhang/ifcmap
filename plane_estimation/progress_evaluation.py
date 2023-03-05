@@ -51,6 +51,7 @@ if __name__ == '__main__':
     segment_folder = data_folder
     
     raw_pcd = o3d.io.read_point_cloud(os.path.join(data_folder, 'raw_map.ply'))
+    # o3d.visualization.draw_geometries([raw_pcd, ])
     
     with open(os.path.join(segment_folder, 'inliers.pkl'), 'rb') as f:
         inliers = pickle.load(f)
@@ -72,68 +73,78 @@ if __name__ == '__main__':
         model_meshes.append(model_mesh)
         o3d_model_mesh += o3d_mesh
     
-    real_points = list()
-    o3d_real_points = list()
-    scene_pcd = o3d.geometry.PointCloud()
-    cmap_norm = mpl.colors.Normalize(vmin=0.0, vmax=len(target_planes))
-    plane_indices = list(range(len(target_planes)))
-    random.shuffle(plane_indices)
-    for idx, plane in zip(plane_indices, target_planes):
-        o3d_points = o3d.geometry.PointCloud()
-        o3d_points.points = o3d.utility.Vector3dVector(plane.points)
-        o3d_points.normals = o3d.utility.Vector3dVector(
-            np.repeat(plane.plane_params[:, :-1], plane.points.shape[0], axis=0)
-            )
-        color = plt.get_cmap('nipy_spectral')(cmap_norm(idx))[0:3]
-        o3d_points.paint_uniform_color(color)
-        tri_points = trimesh.PointCloud(vertices=plane.points)
-        real_points.append(tri_points)
-        o3d_real_points.append(o3d_points)
-        scene_pcd += o3d_points
+    # real_points = list()
+    # o3d_real_points = list()
+    # scene_pcd = o3d.geometry.PointCloud()
+    # cmap_norm = mpl.colors.Normalize(vmin=0.0, vmax=len(target_planes))
+    # plane_indices = list(range(len(target_planes)))
+    # random.shuffle(plane_indices)
+    # for idx, plane in zip(plane_indices, target_planes):
+    #     o3d_points = o3d.geometry.PointCloud()
+    #     o3d_points.points = o3d.utility.Vector3dVector(plane.points)
+    #     o3d_points.normals = o3d.utility.Vector3dVector(
+    #         np.repeat(plane.plane_params[:, :-1], plane.points.shape[0], axis=0)
+    #         )
+    #     color = plt.get_cmap('nipy_spectral')(cmap_norm(idx))[0:3]
+    #     o3d_points.paint_uniform_color(color)
+    #     tri_points = trimesh.PointCloud(vertices=plane.points)
+    #     real_points.append(tri_points)
+    #     o3d_real_points.append(o3d_points)
+    #     scene_pcd += o3d_points
     
-    if use_aligned:
-        aligned_pcd = copy.deepcopy(scene_pcd).transform(best_trans)
-        aligned_raw_pcd = copy.deepcopy(raw_pcd).transform(best_trans)
-    else:
-        aligned_pcd = scene_pcd
-        aligned_raw_pcd = raw_pcd
+    # if use_aligned:
+    #     aligned_pcd = copy.deepcopy(scene_pcd).transform(best_trans)
+    #     aligned_raw_pcd = copy.deepcopy(raw_pcd).transform(best_trans)
+    # else:
+    #     aligned_pcd = scene_pcd
+    #     aligned_raw_pcd = raw_pcd
         
-    # progress evaluation
-    built_model = o3d.geometry.TriangleMesh()
-    unbuilt_model = o3d.geometry.TriangleMesh()
-    evaluated_pcd = copy.deepcopy(aligned_raw_pcd)
-    pcd_tree = o3d.geometry.KDTreeFlann(aligned_raw_pcd)
-    vol = o3d.visualization.SelectionPolygonVolume()
-    vol.orthogonal_axis = "Z"
-    removed_indices = list()
-    for mesh in tqdm(model_meshes, leave=False):
-        vertex_points = np.asarray(mesh.vertices)
-        mesh_grid = mesh.voxelized(0.27)
-        obb = o3d.geometry.OrientedBoundingBox.create_from_points(o3d.utility.Vector3dVector(vertex_points))
-        search_box = o3d.geometry.OrientedBoundingBox(obb.center, obb.R, obb.extent + 0.05)
-        cropped_pcd = aligned_raw_pcd.crop(search_box)
-        for point_idx, point in enumerate(np.asarray(cropped_pcd.points)):
-            [k, idx, _] = pcd_tree.search_knn_vector_3d(point, 1)
-            removed_indices.append(idx[0])
+    # # progress evaluation
+    # built_model = o3d.geometry.TriangleMesh()
+    # unbuilt_model = o3d.geometry.TriangleMesh()
+    # evaluated_pcd = copy.deepcopy(aligned_raw_pcd)
+    # pcd_tree = o3d.geometry.KDTreeFlann(aligned_raw_pcd)
+    # vol = o3d.visualization.SelectionPolygonVolume()
+    # vol.orthogonal_axis = "Z"
+    # removed_indices = list()
+    # for mesh in tqdm(model_meshes, leave=False):
+    #     vertex_points = np.asarray(mesh.vertices)
+    #     mesh_grid = mesh.voxelized(0.27)
+    #     obb = o3d.geometry.OrientedBoundingBox.create_from_points(o3d.utility.Vector3dVector(vertex_points))
+    #     search_box = o3d.geometry.OrientedBoundingBox(obb.center, obb.R, obb.extent + 0.2)
+    #     cropped_pcd = aligned_raw_pcd.crop(search_box)
+    #     for point_idx, point in enumerate(np.asarray(cropped_pcd.points)):
+    #         [k, idx, _] = pcd_tree.search_knn_vector_3d(point, 1)
+    #         removed_indices.append(idx[0])
         
-        filled_set = set([tuple(index) for index in mesh_grid.sparse_indices])
-        occupied_voxel_set = set([tuple(index) for index in 
-                                  mesh_grid.points_to_indices(np.asarray(cropped_pcd.points)) 
-                                  if tuple(index) in filled_set])
-        o3d_mesh = mesh.as_open3d
-        o3d_mesh.compute_vertex_normals()
-        if (len(occupied_voxel_set)/mesh_grid.filled_count > 0.3):
-            built_model += o3d_mesh
-        else:
-            unbuilt_model += o3d_mesh
+    #     filled_set = set([tuple(index) for index in mesh_grid.sparse_indices])
+    #     occupied_voxel_set = set([tuple(index) for index in 
+    #                               mesh_grid.points_to_indices(np.asarray(cropped_pcd.points)) 
+    #                               if tuple(index) in filled_set])
+    #     o3d_mesh = mesh.as_open3d
+    #     o3d_mesh.compute_vertex_normals()
+    #     if (len(occupied_voxel_set)/mesh_grid.filled_count > 0.3):
+    #         built_model += o3d_mesh
+    #     else:
+    #         unbuilt_model += o3d_mesh
             
-    built_pcd = evaluated_pcd.select_by_index(removed_indices, invert=False)
-    built_pcd.paint_uniform_color(np.array([0, 255, 0])/256)
-    unbuilt_pcd = evaluated_pcd.select_by_index(removed_indices, invert=True)
-    unbuilt_pcd.paint_uniform_color(np.array([255, 48, 48])/256)
-    built_model.paint_uniform_color(np.array([102, 205, 0])/256)
-    unbuilt_model.paint_uniform_color(np.array([255, 48, 48])/256)
-        
+    # built_pcd = evaluated_pcd.select_by_index(removed_indices, invert=False)
+    # built_pcd.paint_uniform_color(np.array([0, 255, 0])/256)
+    # unbuilt_pcd = evaluated_pcd.select_by_index(removed_indices, invert=True)
+    # unbuilt_pcd.paint_uniform_color(np.array([255, 48, 48])/256)
+    # built_model.paint_uniform_color(np.array([102, 205, 0])/256)
+    # unbuilt_model.paint_uniform_color(np.array([255, 48, 48])/256)
+    
+    # o3d.io.write_triangle_mesh(os.path.join(data_folder, 'built_model.ply'), built_model)
+    # o3d.io.write_triangle_mesh(os.path.join(data_folder, 'unbuilt_model.ply'), unbuilt_model)
+    # o3d.io.write_point_cloud(os.path.join(data_folder, 'built_pcd.ply'), built_pcd)
+    # o3d.io.write_point_cloud(os.path.join(data_folder, 'unbuilt_pcd.ply'), unbuilt_pcd)
+    
+    built_pcd = o3d.io.read_point_cloud(os.path.join(data_folder, 'built_pcd.ply'))
+    unbuilt_pcd = o3d.io.read_point_cloud(os.path.join(data_folder, 'unbuilt_pcd.ply'))
+    built_model = o3d.io.read_triangle_mesh(os.path.join(data_folder, 'built_model.ply'))
+    unbuilt_model = o3d.io.read_triangle_mesh(os.path.join(data_folder, 'unbuilt_model.ply'))
+    
     built_mat_bim = set_material(np.array([0, 255, 0])/256)
     unbuilt_mat_bim = set_material(np.array([255, 48, 48])/256)
     geoms = [{'name': 'built_bim_model', 'geometry': built_model, 'material': built_mat_bim}, 
@@ -146,4 +157,5 @@ if __name__ == '__main__':
             show_ui=True,
             width=1920,
             height=1080)
-    # o3d.visualization.draw_geometries([o3d_model_mesh, built_pcd, unbuilt_pcd, ])# built_model, unbuilt_model
+    
+    o3d.visualization.draw_geometries([o3d_model_mesh, built_pcd, unbuilt_pcd, ])# built_model, unbuilt_model
