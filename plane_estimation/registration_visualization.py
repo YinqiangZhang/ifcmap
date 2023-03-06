@@ -99,7 +99,7 @@ def main():
         registor.add_correspondence(inlier)
         registor.set_damping()
         for n_iter in range(600):
-            result_trans, total_V, is_done = registor.optimize(total_iter_num=5)
+            result_trans, total_V, is_done = registor.optimize(total_iter_num=10)
             average_V = registor.get_average_potential()
             line_set, ancher_points_set, key_points_set = registor.get_inlier_lineset()
             print('Add Inlier: {}, Total V: {}, Average V: {}'.format(inlier, total_V, average_V))

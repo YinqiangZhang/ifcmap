@@ -62,8 +62,10 @@ def main():
     for idx, inlier in enumerate(inliers):
         registor.add_correspondence(inlier)
         registor.set_damping()
+        start_time = time.time() 
         trans, total_V, _ = registor.optimize()
         average_V = registor.get_average_potential()
+        print('Optimization time: {}'.format(time.time()-start_time))
         print('Add Inlier: {}, Total V: {}, Average V: {}'.format(inlier, total_V, average_V))
         # aligned_pcd = copy.deepcopy(scene_pcd)
         # aligned_pcd.transform(trans)

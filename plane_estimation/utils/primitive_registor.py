@@ -1,3 +1,4 @@
+import time
 import copy
 import numpy as np
 import open3d as o3d
@@ -24,7 +25,7 @@ class PrimitiveRegistor():
         self.damping = self.damping_c
         self.s_damping = self.s_damping_c
         self.time_step = 0.3
-        self.iteration_num = 1500
+        self.iteration_num = 600
         self.sample_num = 20
         self.s_dot_threshold = s_dot_threshold
         
@@ -147,6 +148,7 @@ class PrimitiveRegistor():
         # self.history_states = list()
         # self.history_V = list()
         for n_iter in range(total_iter_num):
+            # TODO: the dynamics part require about 20ms
             s_dot, spring_energy = self.dynamics()
             _, _, V_total = self.compute_system_energy(spring_energy)
             self.state = self.state + self.time_step * s_dot
@@ -175,7 +177,7 @@ class PrimitiveRegistor():
         omega = self.state[10:]
         rot = R.from_quat(q).as_matrix()
         curr_points = np.matmul(rot, self.ref_points.T).T + xbar
-        
+        # start_time = time.time() 
         # generate vector forces
         composite_force_dict = dict()
         self.point_pairs = list()
@@ -191,7 +193,7 @@ class PrimitiveRegistor():
                 composite_force_dict[primitive_idx] = [forces]
             else:
                 composite_force_dict[primitive_idx].append(forces)
-        
+        # print('Force time: {}'.format(time.time()-start_time))
         # force composition
         force_vectors = list()
         spring_energy = list()
@@ -217,12 +219,13 @@ class PrimitiveRegistor():
         tau_X = np.cross((rot.T @ (curr_points - xbar).T).T, f_total_X)
         tau = np.atleast_2d(tau_X.sum(axis=0)).T
         domega = self.J_inv @ (tau - self.hatmap(omega) @ self.J @ np.atleast_2d(omega).T)
-        
+        # print('Dynamics time: {}'.format(time.time()-start_time))
         s_dot = np.zeros_like(self.state)
         s_dot[:3] = vbar
         s_dot[3:7] = np.squeeze(q_dot)
         s_dot[7:10] = acc_bar / np.linalg.norm(acc_bar) * min(np.linalg.norm(acc_bar), 1000)
         s_dot[10:] = np.squeeze(domega) / np.linalg.norm(domega) * min(np.linalg.norm(domega), 10)
+        # print('Iteration time: {}'.format(time.time()-start_time))
         return s_dot, spring_energy
     
     def compute_system_energy(self, spring_energy):
@@ -251,12 +254,12 @@ class PrimitiveRegistor():
         return projected_points, force_vectors
     
     def get_sdf_distance_gradient(self, mesh_sdf, points):
-        delta = 0.002
+        delta = 0.0001
         sd_0 = mesh_sdf(points)
         sd_x_shift = mesh_sdf(points + [delta, 0.0, 0.0])
         sd_y_shift = mesh_sdf(points + [0.0, delta, 0.0])
         sd_z_shift = mesh_sdf(points + [0.0, 0.0, delta])
-        gradients = np.array([sd_x_shift-sd_0, sd_y_shift-sd_0, sd_z_shift-sd_0])
+        gradients = np.array([(sd_x_shift-sd_0), sd_y_shift-sd_0, sd_z_shift-sd_0])/(2*delta)
         force_vectors = -(gradients/np.linalg.norm(gradients, axis=0) * sd_0).T
         force_vectors[sd_0>0] = np.zeros_like(force_vectors[sd_0>0])
         projected_points = points + force_vectors
